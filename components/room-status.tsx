@@ -5,38 +5,41 @@ import { motion } from "framer-motion";
 import { Clock } from "lucide-react";
 
 interface RoomStatusProps {
-  closesAt: string;
+  lastActivityAt: string; // 最後のメッセージまたはアクティビティの時刻
 }
 
-export function RoomStatus({ closesAt }: RoomStatusProps) {
+export function RoomStatus({ lastActivityAt }: RoomStatusProps) {
   const [timeLeft, setTimeLeft] = useState<string>("");
   const [isUrgent, setIsUrgent] = useState(false);
 
   useEffect(() => {
     const updateTimer = () => {
       const now = new Date().getTime();
-      const closes = new Date(closesAt).getTime();
-      const remaining = Math.max(0, closes - now);
+      const lastActivity = new Date(lastActivityAt).getTime();
+      const diffMs = now - lastActivity;
+      
+      // 6時間 = 21600000ms
+      const sixHoursMs = 6 * 60 * 60 * 1000;
+      const remainingMs = sixHoursMs - diffMs;
 
-      if (remaining <= 0) {
-        setTimeLeft("閉鎖済み");
+      if (remainingMs <= 0) {
+        setTimeLeft("期限切れ");
         setIsUrgent(true);
         return;
       }
 
-      const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+      const remainingMins = Math.floor(remainingMs / (1000 * 60));
+      const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
 
-      // Urgent if less than 1 day remaining
-      setIsUrgent(days < 1);
+      // 6分以内は緊急
+      setIsUrgent(remainingMins <= 6);
 
-      if (days > 0) {
-        setTimeLeft(`残り${days}日${hours}時間`);
-      } else if (hours > 0) {
-        setTimeLeft(`残り${hours}時間${minutes}分`);
+      // 残り6分以内：分単位で表示
+      if (remainingMins <= 6) {
+        setTimeLeft(`あと${remainingMins}min`);
       } else {
-        setTimeLeft(`残り${minutes}分`);
+        // 残り6時間〜6分：1時間単位で表示
+        setTimeLeft(`あと${remainingHours}時間`);
       }
     };
 
@@ -44,7 +47,7 @@ export function RoomStatus({ closesAt }: RoomStatusProps) {
     const interval = setInterval(updateTimer, 60000);
 
     return () => clearInterval(interval);
-  }, [closesAt]);
+  }, [lastActivityAt]);
 
   return (
     <motion.span

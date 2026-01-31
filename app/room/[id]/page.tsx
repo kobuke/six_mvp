@@ -71,6 +71,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const [showNotificationDialog, setShowNotificationDialog] = useState(false);
   const [showGuestColorPicker, setShowGuestColorPicker] = useState(false);
   const [isJoiningAsGuest, setIsJoiningAsGuest] = useState(false);
+  const [lastActivityAt, setLastActivityAt] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -191,207 +192,16 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
       });
 
       setMessages(validMessages);
+      
+      // Set last activity time (last message or room creation time)
+      if (validMessages.length > 0) {
+        const lastMsg = validMessages[validMessages.length - 1];
+        setLastActivityAt(lastMsg.created_at);
+      } else {
+        setLastActivityAt(roomData.created_at);
+      }
+      
       setIsLoading(false);
-    };
-
-    fetchRoom();
-
-    const messagesChannel = supabase
-      .channel(`messages:${roomId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "messages",
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            const newMessage = payload.new as Message;
-            // Only add if not expired
-            if (!newMessage.expires_at || new Date(newMessage.expires_at) > new Date()) {
-              setMessages((prev) => [...prev, newMessage]);
-              // Update last message time in history
-              updateLastMessageAt(roomId, newMessage.created_at);
-              
-              // Send notification for messages from others
-              if (newMessage.sender_uuid !== userUUID) {
-                const content = newMessage.content || "新しいメディアが届きました";
-                sendNotification("SiX", content.substring(0, 50));
-                // Clear typing indicator when they send
-                setIsPartnerTyping(false);
-              }
-            }
-          } else if (payload.eventType === "UPDATE") {
-            const updatedMessage = payload.new as Message;
-            // Only keep if not expired
-            if (!updatedMessage.expires_at || new Date(updatedMessage.expires_at) > new Date()) {
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === updatedMessage.id ? updatedMessage : msg
-                )
-              );
-            } else {
-              // Remove if now expired
-              setMessages((prev) => prev.filter((msg) => msg.id !== updatedMessage.id));
-            }
-          } else if (payload.eventType === "DELETE") {
-            setMessages((prev) =>
-              prev.filter((msg) => msg.id !== payload.old.id)
-            );
-          }
-        }
-      )
-      .subscribe();
-
-    const roomChannel = supabase
-      .channel(`room:${roomId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "rooms",
-          filter: `id=eq.${roomId}`,
-        },
-        (payload) => {
-          const updatedRoom = payload.new as Room;
-          setRoom(updatedRoom);
-          // Sync room name to localStorage
-          if (updatedRoom.name) {
-            updateRoomName(roomId, updatedRoom.name);
-          }
-        }
-      )
-      .subscribe();
-
-    // Typing indicator channel (broadcast)
-    const typingChannel = supabase
-      .channel(`typing:${roomId}`)
-      .on("broadcast", { event: "typing" }, (payload) => {
-        if (payload.payload.user_uuid !== userUUID) {
-          setIsPartnerTyping(true);
-          setPartnerColor(payload.payload.color);
-          
-          // Clear typing after 2 seconds of no activity
-          if (typingTimeoutRef.current) {
-            clearTimeout(typingTimeoutRef.current);
-          }
-          typingTimeoutRef.current = setTimeout(() => {
-            setIsPartnerTyping(false);
-          }, 2000);
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(messagesChannel);
-      supabase.removeChannel(roomChannel);
-      supabase.removeChannel(typingChannel);
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-    };
-  }, [roomId, supabase, userUUID]);
-
-  // Join room as guest (using UUID)
-  useEffect(() => {
-    const joinAsGuest = async () => {
-      if (!room || !userUUID) return;
-      if (room.creator_uuid === userUUID) return;
-      if (room.guest_uuid) return;
-
-      // Get color from session storage (set during join flow)
-      const guestColor = sessionStorage.getItem("six_join_color") || SIX_COLORS[1].hex;
-      sessionStorage.removeItem("six_join_color");
-
-      try {
-        const response = await fetch("/api/rooms", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            room_id: roomId,
-            guest_uuid: userUUID,
-            guest_color: guestColor,
-          }),
-        });
-        
-        if (response.ok) {
-          const updatedRoom = await response.json();
-          setRoom(updatedRoom);
-          
-          // Update room history with color
-          addToRoomHistory({
-            roomId: updatedRoom.id,
-            createdAt: updatedRoom.created_at,
-            isCreator: false,
-            userColor: guestColor,
-          });
-        }
-      } catch (err) {
-        console.error("Failed to join room:", err);
-      }
-    };
-
-    joinAsGuest();
-  }, [room, userUUID, roomId]);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4", "video/webm", "video/quicktime"];
-    if (!validTypes.includes(file.type)) {
-      alert("画像またはビデオファイルのみ送信できます");
-      return;
-    }
-
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-      alert("ファイルサイズは10MB以下にしてください");
-      return;
-    }
-
-    setSelectedFile(file);
-  };
-
-  const uploadAndSendMedia = async () => {
-    if (!selectedFile || !room || isUploading || !userUUID) return;
-
-    setIsUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("roomId", roomId);
-
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
-
-      const { url, mediaType } = await response.json();
-
-      // Send message with media
-      await supabase.from("messages").insert({
-        room_id: roomId,
-        sender_uuid: userUUID,
-        sender_ip: "uuid-based",
-        content: "",
-        media_url: url,
-        media_type: mediaType,
-        is_media_revealed: false,
-      });
-
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     } catch (error) {
       console.error("Upload error:", error);
       alert("アップロードに失敗しました");
@@ -544,6 +354,14 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
       });
 
       setMessages(validMessages);
+      
+      // Set last activity time
+      if (validMessages.length > 0) {
+        const lastMsg = validMessages[validMessages.length - 1];
+        setLastActivityAt(lastMsg.created_at);
+      } else {
+        setLastActivityAt(updatedRoom.created_at);
+      }
     } catch (error) {
       console.error("Failed to join room:", error);
       setError("部屋への参加に失敗しました");
@@ -698,7 +516,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
                   {participantCount}/2
                 </span>
               </span>
-              {room && <RoomStatus closesAt={room.closes_at} />}
+              {room && lastActivityAt && <RoomStatus lastActivityAt={lastActivityAt} />}
             </div>
           </div>
         </div>
