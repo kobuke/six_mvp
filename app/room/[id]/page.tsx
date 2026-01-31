@@ -2,13 +2,15 @@
 
 import { useEffect, useState, useRef, use } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Copy, Check, Send, QrCode, Clock, Users } from "lucide-react";
+import { ArrowLeft, Copy, Check, Send, QrCode, Users } from "lucide-react";
 import Link from "next/link";
 import { QRCodeModal } from "@/components/qr-code-modal";
 import { MessageBubble } from "@/components/message-bubble";
 import { RoomStatus } from "@/components/room-status";
+import { SixLoader, SixLoadingScreen } from "@/components/six-loader";
 
 interface Message {
   id: string;
@@ -41,7 +43,9 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const [showQR, setShowQR] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
   // Scroll to bottom when messages change
@@ -72,7 +76,6 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
         return;
       }
 
-      // Check if room is closed
       if (new Date(roomData.closes_at) < new Date()) {
         setError("この部屋は既に閉鎖されています");
         setIsLoading(false);
@@ -81,7 +84,6 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
 
       setRoom(roomData);
 
-      // Fetch messages
       const { data: messagesData } = await supabase
         .from("messages")
         .select("*")
@@ -94,7 +96,6 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
 
     fetchRoom();
 
-    // Subscribe to new messages
     const messagesChannel = supabase
       .channel(`messages:${roomId}`)
       .on(
@@ -123,7 +124,6 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
       )
       .subscribe();
 
-    // Subscribe to room updates
     const roomChannel = supabase
       .channel(`room:${roomId}`)
       .on(
@@ -163,8 +163,9 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   }, [room, clientIp, roomId, supabase]);
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !room) return;
+    if (!newMessage.trim() || !room || isSending) return;
 
+    setIsSending(true);
     const { error } = await supabase.from("messages").insert({
       room_id: roomId,
       sender_ip: clientIp,
@@ -173,12 +174,14 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
 
     if (!error) {
       setNewMessage("");
+      inputRef.current?.focus();
     }
+    setIsSending(false);
   };
 
   const markAsRead = async (messageId: string) => {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 6 * 60 * 1000); // 6 minutes from now
+    const expiresAt = new Date(now.getTime() + 6 * 60 * 1000);
 
     await supabase
       .from("messages")
@@ -201,22 +204,24 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const participantCount = room?.guest_ip ? 2 : 1;
 
   if (isLoading) {
-    return (
-      <main className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">読み込み中...</div>
-      </main>
-    );
+    return <SixLoadingScreen text="ルームに接続中..." />;
   }
 
   if (error) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-6 px-4">
-        <div className="text-center space-y-4">
-          <h1 className="text-2xl font-light text-foreground">部屋が見つかりません</h1>
+      <main className="h-dvh flex flex-col items-center justify-center gap-6 px-4 bg-background bg-grid-six">
+        <motion.div
+          className="text-center space-y-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-2xl font-light text-foreground">
+            部屋が見つかりません
+          </h1>
           <p className="text-muted-foreground">{error}</p>
-        </div>
+        </motion.div>
         <Link href="/">
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2 border-border hover:border-six-pink/50 hover:bg-six-pink/10">
             <ArrowLeft className="w-4 h-4" />
             ホームに戻る
           </Button>
@@ -226,23 +231,29 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   }
 
   return (
-    <main className="h-screen flex flex-col bg-background">
+    <main className="h-dvh flex flex-col bg-background overflow-hidden">
       {/* Header */}
-      <header className="border-b border-border px-4 py-3 flex items-center justify-between shrink-0">
+      <motion.header
+        className="border-b border-border/50 px-4 py-3 flex items-center justify-between shrink-0 backdrop-blur-sm bg-background/80 safe-top"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
         <div className="flex items-center gap-3">
           <Link href="/">
-            <Button variant="ghost" size="icon" className="h-9 w-9">
+            <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-six-pink/10">
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
           <div>
             <h1 className="text-lg font-medium">
-              Si<span className="text-accent">X</span> Room
+              Si<span className="text-gradient-six">X</span> Room
             </h1>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Users className="w-3 h-3" />
-                {participantCount}/2
+                <span className={participantCount === 2 ? "text-six-pink" : ""}>
+                  {participantCount}/2
+                </span>
               </span>
               {room && <RoomStatus closesAt={room.closes_at} />}
             </div>
@@ -254,7 +265,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
             variant="ghost"
             size="icon"
             onClick={() => setShowQR(true)}
-            className="h-9 w-9"
+            className="h-9 w-9 hover:bg-six-purple/10"
           >
             <QrCode className="w-5 h-5" />
           </Button>
@@ -262,52 +273,66 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
             variant="ghost"
             size="icon"
             onClick={copyRoomLink}
-            className="h-9 w-9"
+            className="h-9 w-9 hover:bg-six-pink/10"
           >
             {copied ? (
-              <Check className="w-5 h-5 text-accent" />
+              <Check className="w-5 h-5 text-six-pink" />
             ) : (
               <Copy className="w-5 h-5" />
             )}
           </Button>
         </div>
-      </header>
+      </motion.header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center">
-            <div className="space-y-4">
-              <div className="mx-auto w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
-                <Clock className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <div className="space-y-2">
-                <p className="text-muted-foreground">
-                  {isCreator ? "相手を待っています..." : "最初のメッセージを送信しましょう"}
-                </p>
-                {isCreator && !room?.guest_ip && (
-                  <p className="text-xs text-muted-foreground/60">
-                    URLまたはQRコードを共有して相手を招待してください
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 overscroll-contain">
+        <AnimatePresence mode="popLayout">
+          {messages.length === 0 ? (
+            <motion.div
+              key="empty-state"
+              className="h-full flex flex-col items-center justify-center text-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <div className="space-y-6">
+                <div className="mx-auto">
+                  <SixLoader size="lg" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-muted-foreground">
+                    {isCreator
+                      ? "相手を待っています..."
+                      : "最初のメッセージを送信しましょう"}
                   </p>
-                )}
+                  {isCreator && !room?.guest_ip && (
+                    <p className="text-xs text-muted-foreground/60">
+                      URLまたはQRコードを共有して相手を招待してください
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-        ) : (
-          messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              isOwn={message.sender_ip === clientIp}
-              onRead={() => markAsRead(message.id)}
-            />
-          ))
-        )}
+            </motion.div>
+          ) : (
+            messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isOwn={message.sender_ip === clientIp}
+                onRead={() => markAsRead(message.id)}
+              />
+            ))
+          )}
+        </AnimatePresence>
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <div className="border-t border-border p-4 shrink-0">
+      <motion.div
+        className="border-t border-border/50 p-4 shrink-0 backdrop-blur-sm bg-background/80 safe-bottom"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -316,20 +341,25 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
           className="flex items-center gap-3"
         >
           <Input
+            ref={inputRef}
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="メッセージを入力..."
-            className="flex-1 h-12 bg-secondary border-border"
+            className="flex-1 h-12 bg-secondary/50 border-border/50 focus:border-six-pink/50 focus:ring-six-pink/20 transition-all"
           />
           <Button
             type="submit"
-            disabled={!newMessage.trim()}
-            className="h-12 w-12 bg-foreground text-background hover:bg-foreground/90"
+            disabled={!newMessage.trim() || isSending}
+            className="h-12 w-12 bg-gradient-to-br from-six-pink to-six-purple text-white hover:opacity-90 disabled:opacity-30 transition-all glow-six-pink"
           >
-            <Send className="w-5 h-5" />
+            {isSending ? (
+              <SixLoader size="sm" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
           </Button>
         </form>
-      </div>
+      </motion.div>
 
       {/* QR Code Modal */}
       <QRCodeModal

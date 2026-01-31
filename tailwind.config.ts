@@ -52,6 +52,10 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // SiX brand colors
+        "six-pink": "hsl(var(--six-pink))",
+        "six-purple": "hsl(var(--six-purple))",
+        "six-glow": "hsl(var(--six-glow))",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -60,6 +64,7 @@ const config = {
       },
       fontFamily: {
         sans: ["var(--font-inter)", "sans-serif"],
+        mono: ["var(--font-mono)", "JetBrains Mono", "monospace"],
       },
       keyframes: {
         "accordion-down": {
