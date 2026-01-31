@@ -7,6 +7,7 @@ export interface RoomHistoryItem {
   isCreator: boolean;
   userColor: string;
   lastMessageAt?: string; // 最後のメッセージの時刻
+  roomName?: string; // ルーム名
 }
 
 const STORAGE_KEY = "six_room_history";
@@ -45,7 +46,7 @@ export function getRoomHistory(): RoomHistoryItem[] {
   }
 }
 
-export function addToRoomHistory(item: Omit<RoomHistoryItem, "lastVisitedAt">): void {
+export function addToRoomHistory(item: Omit<RoomHistoryItem, "lastVisitedAt" | "lastMessageAt">): void {
   if (typeof window === "undefined") return;
   
   try {
@@ -58,8 +59,13 @@ export function addToRoomHistory(item: Omit<RoomHistoryItem, "lastVisitedAt">): 
     };
     
     if (existingIndex >= 0) {
-      // Update existing item
-      history[existingIndex] = { ...history[existingIndex], ...newItem };
+      // Update existing item, preserve lastMessageAt if exists
+      history[existingIndex] = { 
+        ...history[existingIndex], 
+        ...newItem,
+        // Update roomName if provided, otherwise keep existing
+        roomName: item.roomName || history[existingIndex].roomName,
+      };
     } else {
       // Add new item
       history.unshift(newItem);
@@ -110,6 +116,22 @@ export function updateLastMessageAt(roomId: string, timestamp?: string): void {
     
     if (index >= 0) {
       history[index].lastMessageAt = timestamp || new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function updateRoomName(roomId: string, name: string): void {
+  if (typeof window === "undefined") return;
+  
+  try {
+    const history = getRoomHistory();
+    const index = history.findIndex((h) => h.roomId === roomId);
+    
+    if (index >= 0) {
+      history[index].roomName = name;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
     }
   } catch {
