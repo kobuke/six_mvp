@@ -11,7 +11,7 @@ import { QRCodeModal } from "@/components/qr-code-modal";
 import { MessageBubble } from "@/components/message-bubble";
 import { RoomStatus } from "@/components/room-status";
 import { SixLoader, SixLoadingScreen } from "@/components/six-loader";
-import { getOrCreateUserUUID } from "@/lib/crypto";
+import { getUserUUID } from "@/lib/crypto";
 
 interface Message {
   id: string;
@@ -59,7 +59,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
 
   // Get or create user UUID from localStorage
   useEffect(() => {
-    const uuid = getOrCreateUserUUID();
+    const uuid = getUserUUID();
     setUserUUID(uuid);
   }, []);
 

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Clock, Lock, MessageSquare } from "lucide-react";
 import { SixLoader } from "@/components/six-loader";
-import { getOrCreateUserUUID } from "@/lib/crypto";
+import { getUserUUID } from "@/lib/crypto";
 
 export default function HomePage() {
   const router = useRouter();
@@ -18,7 +18,7 @@ export default function HomePage() {
 
   // Get or create user UUID on mount
   useEffect(() => {
-    const uuid = getOrCreateUserUUID();
+    const uuid = getUserUUID();
     setUserUUID(uuid);
   }, []);
 
