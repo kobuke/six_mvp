@@ -71,7 +71,12 @@ export function SixLoader({ size = "md", className = "" }: SixLoaderProps) {
               height: dot,
               backgroundColor: color,
               boxShadow: `0 0 ${dot * 2}px ${color}`,
-              transform: `translateX(${pos.x}px) translateY(${pos.y}px)`,
+              left: "50%",
+              top: "50%",
+              x: pos.x,
+              y: pos.y,
+              translateX: "-50%",
+              translateY: "-50%",
             }}
             animate={{
               rotate: [0, 360],

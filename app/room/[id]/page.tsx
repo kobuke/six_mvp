@@ -303,7 +303,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center">
             <div className="space-y-6">
-              <div className="mx-auto">
+              <div className="w-full flex justify-center">
                 <SixLoader size="lg" />
               </div>
               <div className="space-y-2">
@@ -320,18 +320,17 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
               </div>
             </div>
           </div>
-        ) : (
-          <AnimatePresence mode="popLayout">
-            {messages.map((message) => (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                isOwn={isOwnMessage(message)}
-                onRead={() => markAsRead(message.id)}
-              />
-            ))}
-          </AnimatePresence>
-        )}
+        ) : null}
+        <AnimatePresence mode="popLayout">
+          {messages.map((message) => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              isOwn={isOwnMessage(message)}
+              onRead={() => markAsRead(message.id)}
+            />
+          ))}
+        </AnimatePresence>
         <div ref={messagesEndRef} />
       </div>
 
