@@ -159,7 +159,7 @@ export default function HomePage() {
               <div className="py-4">
                 <ColorPicker
                   selectedColor={selectedColor}
-                  onColorSelect={setSelectedColor}
+                  onColorSelect={(color) => setSelectedColor(color)}
                   size="lg"
                 />
               </div>
@@ -245,7 +245,7 @@ export default function HomePage() {
                 </p>
                 <ColorPicker
                   selectedColor={selectedColor}
-                  onColorSelect={setSelectedColor}
+                  onColorSelect={(color) => setSelectedColor(color)}
                   size="md"
                 />
               </div>
