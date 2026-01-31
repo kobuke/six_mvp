@@ -17,6 +17,7 @@ import { getUserUUID } from "@/lib/crypto";
 import { addToRoomHistory, updateLastMessageAt, updateRoomName } from "@/lib/room-history";
 import { NotificationPermissionDialog, sendNotification } from "@/components/notification-permission-dialog";
 import { TypingIndicator } from "@/components/typing-indicator";
+import { GuestColorPickerModal } from "@/components/guest-color-picker-modal";
 import { SIX_COLORS } from "@/components/color-picker";
 
 interface Message {
@@ -68,6 +69,8 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const [partnerColor, setPartnerColor] = useState<string | null>(null);
   const [showNotificationDialog, setShowNotificationDialog] = useState(false);
+  const [showGuestColorPicker, setShowGuestColorPicker] = useState(false);
+  const [isJoiningAsGuest, setIsJoiningAsGuest] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,6 +152,15 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
         setTimeout(() => {
           router.push("/");
         }, 6000);
+        return;
+      }
+
+      // If not creator and not yet registered as guest, show color picker
+      if (!isCreator && !isGuest) {
+        setIsJoiningAsGuest(true);
+        setShowGuestColorPicker(true);
+        setRoom(roomData);
+        setIsLoading(false);
         return;
       }
 
@@ -479,6 +491,66 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
     // Plain Enter or Shift+Enter always creates a new line (default behavior)
   };
 
+  const handleGuestColorSelected = async (color: string) => {
+    try {
+      // Join room as guest with selected color
+      const response = await fetch("/api/rooms", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room_id: roomId,
+          guest_uuid: userUUID,
+          guest_color: color,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        if (error.code === "ROOM_FULL") {
+          setIsRoomFull(true);
+          setShowGuestColorPicker(false);
+          setTimeout(() => router.push("/"), 6000);
+          return;
+        }
+        throw new Error("Failed to join room");
+      }
+
+      const updatedRoom = await response.json();
+      setRoom(updatedRoom);
+      setShowGuestColorPicker(false);
+      setIsJoiningAsGuest(false);
+
+      // Add to room history
+      addToRoomHistory({
+        roomId: updatedRoom.id,
+        createdAt: updatedRoom.created_at,
+        isCreator: false,
+        userColor: color,
+        roomName: updatedRoom.name || undefined,
+      });
+
+      // Now load messages
+      const { data: messagesData } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("room_id", roomId)
+        .order("created_at", { ascending: true });
+
+      const now = new Date();
+      const validMessages = (messagesData || []).filter((msg: Message) => {
+        if (!msg.expires_at) return true;
+        const expiresAt = new Date(msg.expires_at);
+        return expiresAt > now;
+      });
+
+      setMessages(validMessages);
+    } catch (error) {
+      console.error("Failed to join room:", error);
+      setError("部屋への参加に失敗しました");
+      setShowGuestColorPicker(false);
+    }
+  };
+
   const handleNameEdit = () => {
     if (!room) return;
     setEditedName(room.name || "SiX Room");
@@ -512,8 +584,12 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const participantCount = room?.guest_uuid ? 2 : 1;
   const userColor = getUserColor();
 
-  if (isLoading) {
-    return <SixLoadingScreen text="ルームに接���中..." />;
+  if (isLoading || isJoiningAsGuest) {
+    return (
+      <main className="h-dvh flex items-center justify-center bg-background bg-grid-six">
+        <SixLoader size="lg" />
+      </main>
+    );
   }
 
   if (isRoomFull) {
@@ -804,6 +880,12 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
       <NotificationPermissionDialog
         open={showNotificationDialog}
         onClose={() => setShowNotificationDialog(false)}
+      />
+
+      {/* Guest Color Picker Modal */}
+      <GuestColorPickerModal
+        open={showGuestColorPicker}
+        onColorSelected={handleGuestColorSelected}
       />
     </main>
   );
