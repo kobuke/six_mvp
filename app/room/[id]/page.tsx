@@ -584,10 +584,22 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const participantCount = room?.guest_uuid ? 2 : 1;
   const userColor = getUserColor();
 
-  if (isLoading || isJoiningAsGuest) {
+  if (isLoading) {
     return (
       <main className="h-dvh flex items-center justify-center bg-background bg-grid-six">
         <SixLoader size="lg" />
+      </main>
+    );
+  }
+
+  // Show guest color picker modal if joining as guest
+  if (isJoiningAsGuest && showGuestColorPicker) {
+    return (
+      <main className="h-dvh flex items-center justify-center bg-background bg-grid-six">
+        <GuestColorPickerModal
+          open={showGuestColorPicker}
+          onColorSelected={handleGuestColorSelected}
+        />
       </main>
     );
   }
@@ -880,12 +892,6 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
       <NotificationPermissionDialog
         open={showNotificationDialog}
         onClose={() => setShowNotificationDialog(false)}
-      />
-
-      {/* Guest Color Picker Modal */}
-      <GuestColorPickerModal
-        open={showGuestColorPicker}
-        onColorSelected={handleGuestColorSelected}
       />
     </main>
   );
