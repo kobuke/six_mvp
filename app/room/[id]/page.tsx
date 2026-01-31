@@ -304,6 +304,59 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
     // Plain Enter or Shift+Enter always creates a new line (default behavior)
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && (file.type.startsWith("image/") || file.type.startsWith("video/"))) {
+      setSelectedFile(file);
+      setNewMessage(""); // Clear text when media is selected
+    }
+  };
+
+  const uploadAndSendMedia = async () => {
+    if (!selectedFile || !room || isUploading || !userUUID) return;
+
+    setIsUploading(true);
+    try {
+      // Upload to blob storage
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const { url } = await uploadRes.json();
+
+      // Send message with media URL
+      const messageType = selectedFile.type.startsWith("image/") ? "image" : "video";
+      const { error } = await supabase.from("messages").insert({
+        room_id: roomId,
+        sender_uuid: userUUID,
+        sender_ip: "uuid-based",
+        content: url,
+        media_type: messageType,
+        media_url: url,
+      });
+
+      if (!error) {
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("アップロードに失敗しました");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleGuestColorSelected = async (color: string) => {
     try {
       // Join room as guest with selected color
