@@ -1,24 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Clock, Lock, MessageSquare } from "lucide-react";
 import { SixLoader } from "@/components/six-loader";
+import { getOrCreateUserUUID } from "@/lib/crypto";
 
 export default function HomePage() {
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
   const [roomCode, setRoomCode] = useState("");
   const [isJoining, setIsJoining] = useState(false);
+  const [userUUID, setUserUUID] = useState<string>("");
+
+  // Get or create user UUID on mount
+  useEffect(() => {
+    const uuid = getOrCreateUserUUID();
+    setUserUUID(uuid);
+  }, []);
 
   const createRoom = async () => {
+    if (!userUUID) return;
+    
     setIsCreating(true);
     try {
       const response = await fetch("/api/rooms", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creator_uuid: userUUID }),
       });
       const data = await response.json();
       if (data.roomId) {

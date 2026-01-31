@@ -11,11 +11,13 @@ import { QRCodeModal } from "@/components/qr-code-modal";
 import { MessageBubble } from "@/components/message-bubble";
 import { RoomStatus } from "@/components/room-status";
 import { SixLoader, SixLoadingScreen } from "@/components/six-loader";
+import { getOrCreateUserUUID } from "@/lib/crypto";
 
 interface Message {
   id: string;
   room_id: string;
-  sender_ip: string;
+  sender_uuid: string;
+  sender_ip: string; // Keep for backwards compatibility
   content: string;
   is_read: boolean;
   read_at: string | null;
@@ -26,6 +28,8 @@ interface Message {
 interface Room {
   id: string;
   name: string;
+  creator_uuid: string;
+  guest_uuid: string | null;
   creator_ip: string;
   guest_ip: string | null;
   status: string;
@@ -38,7 +42,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const [room, setRoom] = useState<Room | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [clientIp, setClientIp] = useState<string>("");
+  const [userUUID, setUserUUID] = useState<string>("");
   const [copied, setCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,16 +57,16 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Fetch client IP
+  // Get or create user UUID from localStorage
   useEffect(() => {
-    fetch("/api/ip")
-      .then((res) => res.json())
-      .then((data) => setClientIp(data.ip))
-      .catch(() => setClientIp("unknown"));
+    const uuid = getOrCreateUserUUID();
+    setUserUUID(uuid);
   }, []);
 
   // Fetch room and messages
   useEffect(() => {
+    if (!userUUID) return;
+
     const fetchRoom = async () => {
       const { data: roomData, error: roomError } = await supabase
         .from("rooms")
@@ -144,31 +148,40 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(roomChannel);
     };
-  }, [roomId, supabase]);
+  }, [roomId, supabase, userUUID]);
 
-  // Join room as guest
+  // Join room as guest (using UUID)
   useEffect(() => {
     const joinAsGuest = async () => {
-      if (!room || !clientIp || clientIp === "unknown") return;
-      if (room.creator_ip === clientIp) return;
-      if (room.guest_ip) return;
+      if (!room || !userUUID) return;
+      if (room.creator_uuid === userUUID) return;
+      if (room.guest_uuid) return;
 
-      await supabase
-        .from("rooms")
-        .update({ guest_ip: clientIp })
-        .eq("id", roomId);
+      try {
+        await fetch("/api/rooms", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            room_id: roomId,
+            guest_uuid: userUUID,
+          }),
+        });
+      } catch (err) {
+        console.error("Failed to join room:", err);
+      }
     };
 
     joinAsGuest();
-  }, [room, clientIp, roomId, supabase]);
+  }, [room, userUUID, roomId]);
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !room || isSending) return;
+    if (!newMessage.trim() || !room || isSending || !userUUID) return;
 
     setIsSending(true);
     const { error } = await supabase.from("messages").insert({
       room_id: roomId,
-      sender_ip: clientIp,
+      sender_uuid: userUUID,
+      sender_ip: "uuid-based", // Keep for backwards compatibility
       content: newMessage.trim(),
     });
 
@@ -181,7 +194,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
 
   const markAsRead = async (messageId: string) => {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 6 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + 6 * 60 * 1000); // 6 minutes
 
     await supabase
       .from("messages")
@@ -200,8 +213,9 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const isCreator = room?.creator_ip === clientIp;
-  const participantCount = room?.guest_ip ? 2 : 1;
+  const isCreator = room?.creator_uuid === userUUID;
+  const isOwnMessage = (message: Message) => message.sender_uuid === userUUID;
+  const participantCount = room?.guest_uuid ? 2 : 1;
 
   if (isLoading) {
     return <SixLoadingScreen text="ルームに接続中..." />;
@@ -298,7 +312,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
                     ? "相手を待っています..."
                     : "最初のメッセージを送信しましょう"}
                 </p>
-                {isCreator && !room?.guest_ip && (
+                {isCreator && !room?.guest_uuid && (
                   <p className="text-xs text-muted-foreground/60">
                     URLまたはQRコードを共有して相手を招待してください
                   </p>
@@ -312,7 +326,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
               <MessageBubble
                 key={message.id}
                 message={message}
-                isOwn={message.sender_ip === clientIp}
+                isOwn={isOwnMessage(message)}
                 onRead={() => markAsRead(message.id)}
               />
             ))}

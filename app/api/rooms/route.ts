@@ -1,23 +1,28 @@
 import { createClient } from "@/lib/supabase/server";
-import { headers } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const headersList = await headers();
-    
-    // Get client IP from headers
-    const forwardedFor = headersList.get("x-forwarded-for");
-    const realIp = headersList.get("x-real-ip");
-    const clientIp = forwardedFor?.split(",")[0] || realIp || "unknown";
+    const body = await request.json();
+    const { creator_uuid } = body;
 
-    // Create a new room
+    if (!creator_uuid) {
+      return NextResponse.json(
+        { error: "Creator UUID is required" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    // Create new room with UUID
     const { data: room, error } = await supabase
       .from("rooms")
       .insert({
-        creator_ip: clientIp,
+        creator_uuid,
+        creator_ip: "uuid-based", // Keep for backwards compatibility
         status: "active",
+        closes_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(), // 6 days
       })
       .select()
       .single();
@@ -30,7 +35,7 @@ export async function POST() {
       );
     }
 
-    return NextResponse.json({ roomId: room.id });
+    return NextResponse.json({ roomId: room.id, room });
   } catch (error) {
     console.error("Error in POST /api/rooms:", error);
     return NextResponse.json(
@@ -40,7 +45,7 @@ export async function POST() {
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const roomId = searchParams.get("id");
@@ -67,9 +72,88 @@ export async function GET(request: Request) {
       );
     }
 
+    // Check if room is expired
+    if (room.closes_at && new Date(room.closes_at) < new Date()) {
+      return NextResponse.json(
+        { error: "Room has expired", code: "ROOM_EXPIRED" },
+        { status: 410 }
+      );
+    }
+
     return NextResponse.json(room);
   } catch (error) {
     console.error("Error in GET /api/rooms:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { room_id, guest_uuid } = body;
+
+    if (!room_id || !guest_uuid) {
+      return NextResponse.json(
+        { error: "Room ID and Guest UUID are required" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    // First check if room exists
+    const { data: existingRoom, error: fetchError } = await supabase
+      .from("rooms")
+      .select("*")
+      .eq("id", room_id)
+      .single();
+
+    if (fetchError || !existingRoom) {
+      return NextResponse.json(
+        { error: "Room not found" },
+        { status: 404 }
+      );
+    }
+
+    // Check if guest_uuid is same as creator (can't join own room as guest)
+    if (existingRoom.creator_uuid === guest_uuid) {
+      return NextResponse.json(existingRoom);
+    }
+
+    // Check if room already has a different guest
+    if (existingRoom.guest_uuid && existingRoom.guest_uuid !== guest_uuid) {
+      return NextResponse.json(
+        { error: "Room is full", code: "ROOM_FULL" },
+        { status: 403 }
+      );
+    }
+
+    // Update room with guest UUID
+    const { data: room, error } = await supabase
+      .from("rooms")
+      .update({
+        guest_uuid,
+        guest_ip: "uuid-based", // Keep for backwards compatibility
+        last_activity_at: new Date().toISOString(),
+      })
+      .eq("id", room_id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating room:", error);
+      return NextResponse.json(
+        { error: "Failed to join room" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(room);
+  } catch (error) {
+    console.error("Error in PATCH /api/rooms:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
