@@ -16,6 +16,7 @@ export function RoomHistoryList({ onRoomSelect }: RoomHistoryListProps) {
   const [history, setHistory] = useState<RoomHistoryItem[]>([]);
   const [roomStatuses, setRoomStatuses] = useState<Record<string, "active" | "closed" | "unknown">>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [, setTick] = useState(0); // カウントダウン更新用
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -48,6 +49,15 @@ export function RoomHistoryList({ onRoomSelect }: RoomHistoryListProps) {
     };
 
     loadHistory();
+    
+    // 60秒ごとにカウントダウンを更新し、期限切れをチェック
+    const interval = setInterval(() => {
+      setTick((prev) => prev + 1);
+      const items = getRoomHistory(); // これで自動的に期限切れが除外される
+      setHistory(items);
+    }, 60000); // 1分ごと
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleRoomClick = (roomId: string) => {
@@ -64,19 +74,31 @@ export function RoomHistoryList({ onRoomSelect }: RoomHistoryListProps) {
     setHistory((prev) => prev.filter((h) => h.roomId !== roomId));
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatDate = (item: RoomHistoryItem) => {
+    const lastActivityTime = item.lastMessageAt || item.lastVisitedAt;
+    const lastActivity = new Date(lastActivityTime);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 1) return "たった今";
-    if (diffMins < 60) return `${diffMins}分前`;
-    if (diffHours < 24) return `${diffHours}時間前`;
-    if (diffDays < 7) return `${diffDays}日前`;
-    return date.toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
+    const diffMs = now.getTime() - lastActivity.getTime();
+    
+    // 6時間 = 21600000ms
+    const sixHoursMs = 6 * 60 * 60 * 1000;
+    const remainingMs = sixHoursMs - diffMs;
+    
+    // 既に6時間を過ぎている場合
+    if (remainingMs <= 0) {
+      return "期限切れ";
+    }
+    
+    const remainingMins = Math.floor(remainingMs / (1000 * 60));
+    const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
+    
+    // 残り6分以内：分単位で表示
+    if (remainingMins <= 6) {
+      return `あと${remainingMins}min`;
+    }
+    
+    // 残り6時間〜6分：1時間単位で表示
+    return `あと${remainingHours}時間`;
   };
 
   if (isLoading) {
@@ -139,7 +161,7 @@ export function RoomHistoryList({ onRoomSelect }: RoomHistoryListProps) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium truncate">
-                      {item.isCreator ? "作成したルーム" : "参加したルーム"}
+                      {item.roomName || (item.isCreator ? "作成したルーム" : "参加したルーム")}
                     </span>
                     {isClosed && (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-destructive/20 text-destructive">
@@ -148,7 +170,7 @@ export function RoomHistoryList({ onRoomSelect }: RoomHistoryListProps) {
                     )}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {formatDate(item.lastVisitedAt)}
+                    {formatDate(item)}
                   </div>
                 </div>
               </div>

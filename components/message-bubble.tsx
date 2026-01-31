@@ -218,7 +218,10 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
 
   // Countdown timer for read messages
   useEffect(() => {
-    if (!message.expires_at) return;
+    if (!message.expires_at) {
+      setTimeLeft(null);
+      return;
+    }
 
     const updateTimer = () => {
       const now = new Date().getTime();
@@ -238,12 +241,16 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
-  }, [message.expires_at]);
+  }, [message.expires_at, message.id]);
 
   const formatTime = useCallback((seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+    // 360秒〜61秒：分単位で表示
+    if (seconds > 60) {
+      const mins = Math.ceil(seconds / 60); // 切り上げで「残り○分」を表示
+      return `残り${mins}分`;
+    }
+    // 60秒以下：秒単位で表示
+    return `${seconds}s`;
   }, []);
 
   const formatCreatedAt = useCallback((dateString: string) => {
@@ -253,11 +260,6 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
       minute: "2-digit",
     });
   }, []);
-
-  // Don't render if fully dissolved
-  if (!isVisible) {
-    return null;
-  }
 
   const isUrgent = timeLeft !== null && timeLeft <= 60;
   const isCritical = timeLeft !== null && timeLeft <= 10;
@@ -270,6 +272,11 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
       )),
     [userColor]
   );
+
+  // Don't render if fully dissolved - but do this with display: none to avoid hook order issues
+  if (!isVisible) {
+    return <div style={{ display: "none" }} />;
+  }
 
   return (
     <AnimatePresence mode="wait">
@@ -333,7 +340,7 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
           {isMediaMessage ? (
             <MediaPreview message={message} isOwn={isOwn} userColor={userColor} />
           ) : (
-            <p className="text-sm leading-relaxed break-words relative z-10 text-foreground">
+            <p className="text-sm leading-relaxed break-words relative z-10 text-foreground whitespace-pre-wrap">
               {message.content}
             </p>
           )}
