@@ -133,7 +133,6 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
       setRoom(roomData);
 
       // Add to room history
-      const isCreator = roomData.creator_uuid === userUUID;
       const userColor = isCreator ? roomData.creator_color : roomData.guest_color;
       addToRoomHistory({
         roomId: roomData.id,
@@ -400,7 +399,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const userColor = getUserColor();
 
   if (isLoading) {
-    return <SixLoadingScreen text="ルームに接続中..." />;
+    return <SixLoadingScreen text="ルームに接���中..." />;
   }
 
   if (isRoomFull) {
