@@ -286,44 +286,38 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 overscroll-contain">
-        <AnimatePresence mode="popLayout">
-          {messages.length === 0 ? (
-            <motion.div
-              key="empty-state"
-              className="h-full flex flex-col items-center justify-center text-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <div className="space-y-6">
-                <div className="mx-auto">
-                  <SixLoader size="lg" />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-muted-foreground">
-                    {isCreator
-                      ? "相手を待っています..."
-                      : "最初のメッセージを送信しましょう"}
-                  </p>
-                  {isCreator && !room?.guest_ip && (
-                    <p className="text-xs text-muted-foreground/60">
-                      URLまたはQRコードを共有して相手を招待してください
-                    </p>
-                  )}
-                </div>
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center">
+            <div className="space-y-6">
+              <div className="mx-auto">
+                <SixLoader size="lg" />
               </div>
-            </motion.div>
-          ) : (
-            messages.map((message) => (
+              <div className="space-y-2">
+                <p className="text-muted-foreground">
+                  {isCreator
+                    ? "相手を待っています..."
+                    : "最初のメッセージを送信しましょう"}
+                </p>
+                {isCreator && !room?.guest_ip && (
+                  <p className="text-xs text-muted-foreground/60">
+                    URLまたはQRコードを共有して相手を招待してください
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {messages.map((message) => (
               <MessageBubble
                 key={message.id}
                 message={message}
                 isOwn={message.sender_ip === clientIp}
                 onRead={() => markAsRead(message.id)}
               />
-            ))
-          )}
-        </AnimatePresence>
+            ))}
+          </AnimatePresence>
+        )}
         <div ref={messagesEndRef} />
       </div>
 

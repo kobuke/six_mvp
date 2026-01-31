@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
 interface SixLoaderProps {
   size?: "sm" | "md" | "lg";
@@ -8,6 +9,12 @@ interface SixLoaderProps {
 }
 
 export function SixLoader({ size = "md", className = "" }: SixLoaderProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const sizeConfig = {
     sm: { container: 24, dot: 4, radius: 8 },
     md: { container: 48, dot: 6, radius: 16 },
@@ -26,6 +33,25 @@ export function SixLoader({ size = "md", className = "" }: SixLoaderProps) {
     "#9d4edd", // soft purple
   ];
 
+  // Pre-calculated positions to avoid hydration mismatch
+  const positions = [
+    { x: radius, y: 0 },           // 0°
+    { x: radius * 0.5, y: radius * 0.866 },  // 60°
+    { x: -radius * 0.5, y: radius * 0.866 }, // 120°
+    { x: -radius, y: 0 },          // 180°
+    { x: -radius * 0.5, y: -radius * 0.866 }, // 240°
+    { x: radius * 0.5, y: -radius * 0.866 },  // 300°
+  ];
+
+  if (!mounted) {
+    return (
+      <div
+        className={`relative flex items-center justify-center ${className}`}
+        style={{ width: container, height: container }}
+      />
+    );
+  }
+
   return (
     <div
       className={`relative flex items-center justify-center ${className}`}
@@ -34,6 +60,7 @@ export function SixLoader({ size = "md", className = "" }: SixLoaderProps) {
       {dotColors.map((color, index) => {
         const angle = (index / 6) * 360;
         const delay = index * 0.12;
+        const pos = positions[index];
 
         return (
           <motion.div
@@ -44,9 +71,10 @@ export function SixLoader({ size = "md", className = "" }: SixLoaderProps) {
               height: dot,
               backgroundColor: color,
               boxShadow: `0 0 ${dot * 2}px ${color}`,
+              transform: `translateX(${pos.x}px) translateY(${pos.y}px)`,
             }}
             animate={{
-              rotate: [angle, angle + 360],
+              rotate: [0, 360],
               scale: [1, 1.2, 0.8, 1],
               opacity: [0.6, 1, 0.6],
             }}
@@ -69,11 +97,6 @@ export function SixLoader({ size = "md", className = "" }: SixLoaderProps) {
                 delay,
               },
             }}
-            initial={{
-              x: Math.cos((angle * Math.PI) / 180) * radius,
-              y: Math.sin((angle * Math.PI) / 180) * radius,
-            }}
-            custom={index}
           />
         );
       })}
