@@ -228,13 +228,6 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
       const expires = new Date(message.expires_at!).getTime();
       const remaining = Math.max(0, Math.floor((expires - now) / 1000));
 
-      console.log("[v0] Message timer update:", {
-        messageId: message.id,
-        remaining,
-        expires: message.expires_at,
-        now: new Date().toISOString(),
-      });
-
       if (remaining <= 0) {
         setIsDissolving(true);
         setTimeout(() => setIsVisible(false), 1500);
@@ -251,9 +244,13 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
   }, [message.expires_at, message.id]);
 
   const formatTime = useCallback((seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+    // 360秒〜61秒：分単位で表示
+    if (seconds > 60) {
+      const mins = Math.ceil(seconds / 60); // 切り上げで「残り○分」を表示
+      return `残り${mins}分`;
+    }
+    // 60秒以下：秒単位で表示
+    return `${seconds}s`;
   }, []);
 
   const formatCreatedAt = useCallback((dateString: string) => {

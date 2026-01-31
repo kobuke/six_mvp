@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, use } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { MessageBubble } from "@/components/message-bubble";
 import { RoomStatus } from "@/components/room-status";
 import { SixLoader, SixLoadingScreen } from "@/components/six-loader";
 import { getUserUUID } from "@/lib/crypto";
-import { addToRoomHistory } from "@/lib/room-history";
+import { addToRoomHistory, updateLastMessageAt } from "@/lib/room-history";
 import { SIX_COLORS } from "@/components/color-picker";
 
 interface Message {
@@ -46,6 +47,7 @@ interface Room {
 
 export default function ChatRoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: roomId } = use(params);
+  const router = useRouter();
   const [room, setRoom] = useState<Room | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -57,6 +59,9 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const [isSending, setIsSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isRoomFull, setIsRoomFull] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -110,6 +115,21 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
         return;
       }
 
+      // Check if room is full (2 participants already)
+      const isCreator = roomData.creator_uuid === userUUID;
+      const isGuest = roomData.guest_uuid === userUUID;
+      const isFull = roomData.guest_uuid && !isCreator && !isGuest;
+      
+      if (isFull) {
+        setIsRoomFull(true);
+        setIsLoading(false);
+        // Redirect to home after 6 seconds
+        setTimeout(() => {
+          router.push("/");
+        }, 6000);
+        return;
+      }
+
       setRoom(roomData);
 
       // Add to room history
@@ -136,12 +156,6 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
         return expiresAt > now;
       });
 
-      console.log("[v0] Loaded messages:", {
-        total: messagesData?.length || 0,
-        valid: validMessages.length,
-        filtered: (messagesData?.length || 0) - validMessages.length,
-      });
-
       setMessages(validMessages);
       setIsLoading(false);
     };
@@ -164,6 +178,8 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
             // Only add if not expired
             if (!newMessage.expires_at || new Date(newMessage.expires_at) > new Date()) {
               setMessages((prev) => [...prev, newMessage]);
+              // Update last message time in history
+              updateLastMessageAt(roomId, newMessage.created_at);
             }
           } else if (payload.eventType === "UPDATE") {
             const updatedMessage = payload.new as Message;
@@ -353,6 +369,31 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleNameEdit = () => {
+    if (!room) return;
+    setEditedName(room.name || "SiX Room");
+    setIsEditingName(true);
+  };
+
+  const handleNameSave = async () => {
+    if (!editedName.trim() || !room) {
+      setIsEditingName(false);
+      return;
+    }
+
+    try {
+      await supabase
+        .from("rooms")
+        .update({ name: editedName.trim() })
+        .eq("id", roomId);
+
+      setIsEditingName(false);
+    } catch (error) {
+      console.error("Failed to update room name:", error);
+      setIsEditingName(false);
+    }
+  };
+
   const isCreator = room?.creator_uuid === userUUID;
   const isOwnMessage = (message: Message) => message.sender_uuid === userUUID;
   const participantCount = room?.guest_uuid ? 2 : 1;
@@ -360,6 +401,31 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
 
   if (isLoading) {
     return <SixLoadingScreen text="ルームに接続中..." />;
+  }
+
+  if (isRoomFull) {
+    return (
+      <main className="h-dvh flex flex-col items-center justify-center gap-6 px-4 bg-background bg-grid-six">
+        <motion.div
+          className="text-center space-y-4"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <div className="w-20 h-20 mx-auto rounded-full bg-destructive/20 flex items-center justify-center">
+            <Users className="w-10 h-10 text-destructive" />
+          </div>
+          <h1 className="text-2xl font-light text-foreground">
+            Full Room
+          </h1>
+          <p className="text-muted-foreground">
+            この部屋にはもう入れません
+          </p>
+          <p className="text-xs text-muted-foreground/60">
+            6秒後にトップへ戻ります...
+          </p>
+        </motion.div>
+      </main>
+    );
   }
 
   if (error) {
@@ -399,10 +465,28 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-lg font-medium">
-              Si<span className="text-gradient-six">X</span> Room
-            </h1>
+          <div className="flex-1 min-w-0">
+            {isEditingName ? (
+              <Input
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                onBlur={handleNameSave}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleNameSave();
+                  if (e.key === "Escape") setIsEditingName(false);
+                }}
+                className="h-7 text-lg font-medium px-2 -ml-2"
+                autoFocus
+                maxLength={30}
+              />
+            ) : (
+              <button
+                onClick={handleNameEdit}
+                className="text-lg font-medium hover:opacity-70 transition-opacity text-left"
+              >
+                {room?.name || "SiX Room"}
+              </button>
+            )}
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Users className="w-3 h-3" />

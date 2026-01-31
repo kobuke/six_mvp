@@ -6,10 +6,12 @@ export interface RoomHistoryItem {
   lastVisitedAt: string;
   isCreator: boolean;
   userColor: string;
+  lastMessageAt?: string; // 最後のメッセージの時刻
 }
 
 const STORAGE_KEY = "six_room_history";
 const MAX_HISTORY_ITEMS = 10;
+const ROOM_EXPIRY_HOURS = 6; // 6時間で自動削除
 
 export function getRoomHistory(): RoomHistoryItem[] {
   if (typeof window === "undefined") return [];
@@ -19,8 +21,23 @@ export function getRoomHistory(): RoomHistoryItem[] {
     if (!stored) return [];
     
     const history: RoomHistoryItem[] = JSON.parse(stored);
+    const now = new Date();
+    const expiryMs = ROOM_EXPIRY_HOURS * 60 * 60 * 1000; // 6時間をミリ秒に変換
+    
+    // 最後のメッセージから6時間以上経過したルームを除外
+    const validHistory = history.filter((item) => {
+      const lastActivityTime = item.lastMessageAt || item.lastVisitedAt;
+      const timeSinceLastActivity = now.getTime() - new Date(lastActivityTime).getTime();
+      return timeSinceLastActivity < expiryMs;
+    });
+    
+    // 履歴に変更があれば保存
+    if (validHistory.length !== history.length) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(validHistory));
+    }
+    
     // Sort by lastVisitedAt descending
-    return history.sort(
+    return validHistory.sort(
       (a, b) => new Date(b.lastVisitedAt).getTime() - new Date(a.lastVisitedAt).getTime()
     );
   } catch {
@@ -77,6 +94,22 @@ export function updateRoomColor(roomId: string, color: string): void {
     
     if (index >= 0) {
       history[index].userColor = color;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function updateLastMessageAt(roomId: string, timestamp?: string): void {
+  if (typeof window === "undefined") return;
+  
+  try {
+    const history = getRoomHistory();
+    const index = history.findIndex((h) => h.roomId === roomId);
+    
+    if (index >= 0) {
+      history[index].lastMessageAt = timestamp || new Date().toISOString();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
     }
   } catch {
