@@ -13,8 +13,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SiX - 6分で消える、6日で閉じる",
-  description: "読んだら6分で消えるメッセージ。6日後に部屋は閉じる。痕跡を残さない、二人だけの特別な空間。",
+  title: "SiX - 6分で消える、6時間で閉じる",
+  description: "読んだら6分で消えるメッセージ。6時間後に部屋は閉じる。痕跡を残さない、二人だけの特別な空間。",
   keywords: ["chat", "ephemeral", "privacy", "secure messaging", "SiX"],
 };
 

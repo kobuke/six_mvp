@@ -91,7 +91,7 @@ export default function HomePage() {
                   Si<span className="text-gradient-six">X</span>
                 </h1>
                 <p className="text-muted-foreground text-lg font-light tracking-wide">
-                  6分で消える、6日で閉じる
+                  6分で消える、6時間で閉じる
                 </p>
               </header>
 

@@ -462,7 +462,15 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
 
   // Handle keyboard shortcuts
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Send on Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux), or plain Enter on mobile
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+    const isEnter = e.key === "Enter";
+    
+    if (isEnter && (isCtrlOrCmd || isMobile)) {
+      // Don't allow shift+enter to send
+      if (e.shiftKey) return;
+      
       e.preventDefault();
       if (selectedFile) {
         uploadAndSendMedia();
@@ -470,6 +478,9 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
         sendMessage();
       }
     }
+    // Shift+Enter always creates a new line (default behavior)
+    // On desktop: plain Enter also creates new line
+    // On mobile: Cmd/Ctrl+Enter or enter sends
   };
 
   const handleNameEdit = () => {
