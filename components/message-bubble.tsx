@@ -254,11 +254,6 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
     });
   }, []);
 
-  // Don't render if fully dissolved
-  if (!isVisible) {
-    return null;
-  }
-
   const isUrgent = timeLeft !== null && timeLeft <= 60;
   const isCritical = timeLeft !== null && timeLeft <= 10;
 
@@ -270,6 +265,11 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
       )),
     [userColor]
   );
+
+  // Don't render if fully dissolved - but do this with display: none to avoid hook order issues
+  if (!isVisible) {
+    return <div style={{ display: "none" }} />;
+  }
 
   return (
     <AnimatePresence mode="wait">
