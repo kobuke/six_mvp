@@ -123,92 +123,95 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
     if (!userUUID) return;
 
     const fetchRoom = async () => {
-      const { data: roomData, error: roomError } = await supabase
-        .from("rooms")
-        .select("*")
-        .eq("id", roomId)
-        .single();
+      try {
+        const { data: roomData, error: roomError } = await supabase
+          .from("rooms")
+          .select("*")
+          .eq("id", roomId)
+          .single();
 
-      if (roomError || !roomData) {
-        setError("この部屋は存在しないか、既に閉鎖されています");
-        setIsLoading(false);
-        return;
-      }
+        if (roomError || !roomData) {
+          setError("この部屋は存在しないか、既に閉鎖されています");
+          setIsLoading(false);
+          return;
+        }
 
-      if (new Date(roomData.closes_at) < new Date()) {
-        setError("この部屋は既に閉鎖されています");
-        setIsLoading(false);
-        return;
-      }
+        if (new Date(roomData.closes_at) < new Date()) {
+          setError("この部屋は既に閉鎖されています");
+          setIsLoading(false);
+          return;
+        }
 
-      // Check if room is full (2 participants already)
-      const isCreator = roomData.creator_uuid === userUUID;
-      const isGuest = roomData.guest_uuid === userUUID;
-      const isFull = roomData.guest_uuid && !isCreator && !isGuest;
-      
-      if (isFull) {
-        setIsRoomFull(true);
-        setIsLoading(false);
-        // Redirect to home after 6 seconds
-        setTimeout(() => {
-          router.push("/");
-        }, 6000);
-        return;
-      }
+        // Check if room is full (2 participants already)
+        const isCreator = roomData.creator_uuid === userUUID;
+        const isGuest = roomData.guest_uuid === userUUID;
+        const isFull = roomData.guest_uuid && !isCreator && !isGuest;
+        
+        if (isFull) {
+          setIsRoomFull(true);
+          setIsLoading(false);
+          // Redirect to home after 6 seconds
+          setTimeout(() => {
+            router.push("/");
+          }, 6000);
+          return;
+        }
 
-      // If not creator and not yet registered as guest, show color picker
-      if (!isCreator && !isGuest) {
-        setIsJoiningAsGuest(true);
-        setShowGuestColorPicker(true);
+        // If not creator and not yet registered as guest, show color picker
+        if (!isCreator && !isGuest) {
+          setIsJoiningAsGuest(true);
+          setShowGuestColorPicker(true);
+          setRoom(roomData);
+          setIsLoading(false);
+          return;
+        }
+
         setRoom(roomData);
+
+        // Add to room history
+        const userColor = isCreator ? roomData.creator_color : roomData.guest_color;
+        addToRoomHistory({
+          roomId: roomData.id,
+          createdAt: roomData.created_at,
+          isCreator,
+          userColor: userColor || SIX_COLORS[0].hex,
+          roomName: roomData.name || undefined,
+        });
+
+        const { data: messagesData } = await supabase
+          .from("messages")
+          .select("*")
+          .eq("room_id", roomId)
+          .order("created_at", { ascending: true });
+
+        // Filter out already-expired messages on initial load
+        const now = new Date();
+        const validMessages = (messagesData || []).filter((msg: Message) => {
+          if (!msg.expires_at) return true;
+          const expiresAt = new Date(msg.expires_at);
+          return expiresAt > now;
+        });
+
+        setMessages(validMessages);
+        
+        // Set last activity time (last message or room creation time)
+        if (validMessages.length > 0) {
+          const lastMsg = validMessages[validMessages.length - 1];
+          setLastActivityAt(lastMsg.created_at);
+        } else {
+          setLastActivityAt(roomData.created_at);
+        }
+        
         setIsLoading(false);
-        return;
+      } catch (error) {
+        console.error("Error fetching room:", error);
+        setError("部屋の読み込みに失敗しました");
+        setIsLoading(false);
       }
+    };
 
-      setRoom(roomData);
-
-      // Add to room history
-      const userColor = isCreator ? roomData.creator_color : roomData.guest_color;
-      addToRoomHistory({
-        roomId: roomData.id,
-        createdAt: roomData.created_at,
-        isCreator,
-        userColor: userColor || SIX_COLORS[0].hex,
-        roomName: roomData.name || undefined,
-      });
-
-      const { data: messagesData } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("room_id", roomId)
-        .order("created_at", { ascending: true });
-
-      // Filter out already-expired messages on initial load
-      const now = new Date();
-      const validMessages = (messagesData || []).filter((msg: Message) => {
-        if (!msg.expires_at) return true;
-        const expiresAt = new Date(msg.expires_at);
-        return expiresAt > now;
-      });
-
-      setMessages(validMessages);
-      
-      // Set last activity time (last message or room creation time)
-      if (validMessages.length > 0) {
-        const lastMsg = validMessages[validMessages.length - 1];
-        setLastActivityAt(lastMsg.created_at);
-      } else {
-        setLastActivityAt(roomData.created_at);
-      }
-      
-      setIsLoading(false);
-    } catch (error) {
-      console.error("Upload error:", error);
-      alert("アップロードに失敗しました");
-    } finally {
-      setIsUploading(false);
-    }
-  };
+    fetchRoom();
+  }, [roomId, userUUID, supabase]);
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !room || isSending || !userUUID) return;
