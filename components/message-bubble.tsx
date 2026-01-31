@@ -340,7 +340,7 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
           {isMediaMessage ? (
             <MediaPreview message={message} isOwn={isOwn} userColor={userColor} />
           ) : (
-            <p className="text-sm leading-relaxed break-words relative z-10 text-foreground">
+            <p className="text-sm leading-relaxed break-words relative z-10 text-foreground whitespace-pre-wrap">
               {message.content}
             </p>
           )}
