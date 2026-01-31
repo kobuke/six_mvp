@@ -5,24 +5,29 @@ import { createClient } from "@/lib/supabase/client";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Copy, Check, Send, QrCode, Users } from "lucide-react";
+import { ArrowLeft, Copy, Check, Send, QrCode, Users, ImagePlus, X } from "lucide-react";
 import Link from "next/link";
 import { QRCodeModal } from "@/components/qr-code-modal";
 import { MessageBubble } from "@/components/message-bubble";
 import { RoomStatus } from "@/components/room-status";
 import { SixLoader, SixLoadingScreen } from "@/components/six-loader";
 import { getUserUUID } from "@/lib/crypto";
+import { addToRoomHistory } from "@/lib/room-history";
+import { SIX_COLORS } from "@/components/color-picker";
 
 interface Message {
   id: string;
   room_id: string;
   sender_uuid: string;
-  sender_ip: string; // Keep for backwards compatibility
+  sender_ip: string;
   content: string;
   is_read: boolean;
   read_at: string | null;
   expires_at: string | null;
   created_at: string;
+  media_url?: string;
+  media_type?: "image" | "video";
+  is_media_revealed?: boolean;
 }
 
 interface Room {
@@ -32,6 +37,8 @@ interface Room {
   guest_uuid: string | null;
   creator_ip: string;
   guest_ip: string | null;
+  creator_color: string;
+  guest_color: string | null;
   status: string;
   closes_at: string;
   created_at: string;
@@ -48,9 +55,26 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
+
+  // Get user's color based on their role in the room
+  const getUserColor = () => {
+    if (!room || !userUUID) return SIX_COLORS[0].hex;
+    if (room.creator_uuid === userUUID) return room.creator_color || SIX_COLORS[0].hex;
+    return room.guest_color || SIX_COLORS[1].hex;
+  };
+
+  // Get color for a message sender
+  const getMessageColor = (message: Message) => {
+    if (!room) return SIX_COLORS[0].hex;
+    if (message.sender_uuid === room.creator_uuid) return room.creator_color || SIX_COLORS[0].hex;
+    return room.guest_color || SIX_COLORS[1].hex;
+  };
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -87,6 +111,16 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
       }
 
       setRoom(roomData);
+
+      // Add to room history
+      const isCreator = roomData.creator_uuid === userUUID;
+      const userColor = isCreator ? roomData.creator_color : roomData.guest_color;
+      addToRoomHistory({
+        roomId: roomData.id,
+        createdAt: roomData.created_at,
+        isCreator,
+        userColor: userColor || SIX_COLORS[0].hex,
+      });
 
       const { data: messagesData } = await supabase
         .from("messages")
@@ -157,15 +191,33 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
       if (room.creator_uuid === userUUID) return;
       if (room.guest_uuid) return;
 
+      // Get color from session storage (set during join flow)
+      const guestColor = sessionStorage.getItem("six_join_color") || SIX_COLORS[1].hex;
+      sessionStorage.removeItem("six_join_color");
+
       try {
-        await fetch("/api/rooms", {
+        const response = await fetch("/api/rooms", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             room_id: roomId,
             guest_uuid: userUUID,
+            guest_color: guestColor,
           }),
         });
+        
+        if (response.ok) {
+          const updatedRoom = await response.json();
+          setRoom(updatedRoom);
+          
+          // Update room history with color
+          addToRoomHistory({
+            roomId: updatedRoom.id,
+            createdAt: updatedRoom.created_at,
+            isCreator: false,
+            userColor: guestColor,
+          });
+        }
       } catch (err) {
         console.error("Failed to join room:", err);
       }
@@ -174,6 +226,69 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
     joinAsGuest();
   }, [room, userUUID, roomId]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4", "video/webm", "video/quicktime"];
+    if (!validTypes.includes(file.type)) {
+      alert("画像またはビデオファイルのみ送信できます");
+      return;
+    }
+
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      alert("ファイルサイズは10MB以下にしてください");
+      return;
+    }
+
+    setSelectedFile(file);
+  };
+
+  const uploadAndSendMedia = async () => {
+    if (!selectedFile || !room || isUploading || !userUUID) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("roomId", roomId);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const { url, mediaType } = await response.json();
+
+      // Send message with media
+      await supabase.from("messages").insert({
+        room_id: roomId,
+        sender_uuid: userUUID,
+        sender_ip: "uuid-based",
+        content: "",
+        media_url: url,
+        media_type: mediaType,
+        is_media_revealed: false,
+      });
+
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("アップロードに失敗しました");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const sendMessage = async () => {
     if (!newMessage.trim() || !room || isSending || !userUUID) return;
 
@@ -181,7 +296,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
     const { error } = await supabase.from("messages").insert({
       room_id: roomId,
       sender_uuid: userUUID,
-      sender_ip: "uuid-based", // Keep for backwards compatibility
+      sender_ip: "uuid-based",
       content: newMessage.trim(),
     });
 
@@ -216,6 +331,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const isCreator = room?.creator_uuid === userUUID;
   const isOwnMessage = (message: Message) => message.sender_uuid === userUUID;
   const participantCount = room?.guest_uuid ? 2 : 1;
+  const userColor = getUserColor();
 
   if (isLoading) {
     return <SixLoadingScreen text="ルームに接続中..." />;
@@ -275,6 +391,14 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
         </div>
 
         <div className="flex items-center gap-2">
+          {/* User color indicator */}
+          <div
+            className="w-3 h-3 rounded-full"
+            style={{
+              backgroundColor: userColor,
+              boxShadow: `0 0 8px ${userColor}`,
+            }}
+          />
           <Button
             variant="ghost"
             size="icon"
@@ -327,12 +451,41 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
               key={message.id}
               message={message}
               isOwn={isOwnMessage(message)}
+              userColor={getMessageColor(message)}
               onRead={() => markAsRead(message.id)}
             />
           ))}
         </AnimatePresence>
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Selected File Preview */}
+      <AnimatePresence>
+        {selectedFile && (
+          <motion.div
+            className="px-4 pb-2 shrink-0"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+          >
+            <div
+              className="relative inline-flex items-center gap-2 px-3 py-2 rounded-xl"
+              style={{
+                backgroundColor: `${userColor}20`,
+                border: `1px solid ${userColor}40`,
+              }}
+            >
+              <span className="text-sm truncate max-w-[200px]">{selectedFile.name}</span>
+              <button
+                onClick={() => setSelectedFile(null)}
+                className="p-1 rounded-full hover:bg-black/20 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Input */}
       <motion.div
@@ -343,23 +496,55 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            sendMessage();
+            if (selectedFile) {
+              uploadAndSendMedia();
+            } else {
+              sendMessage();
+            }
           }}
           className="flex items-center gap-3"
         >
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          
+          {/* Media button */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            className="h-12 w-12 shrink-0 hover:bg-six-purple/10"
+            style={{
+              color: userColor,
+            }}
+          >
+            <ImagePlus className="w-5 h-5" />
+          </Button>
+
           <Input
             ref={inputRef}
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="メッセージを入力..."
-            className="flex-1 h-12 bg-secondary/50 border-border/50 focus:border-six-pink/50 focus:ring-six-pink/20 transition-all"
+            disabled={!!selectedFile}
+            className="flex-1 h-12 bg-secondary/50 border-border/50 focus:border-six-pink/50 focus:ring-six-pink/20 transition-all disabled:opacity-50"
           />
           <Button
             type="submit"
-            disabled={!newMessage.trim() || isSending}
-            className="h-12 w-12 bg-gradient-to-br from-six-pink to-six-purple text-white hover:opacity-90 disabled:opacity-30 transition-all glow-six-pink"
+            disabled={(!newMessage.trim() && !selectedFile) || isSending || isUploading}
+            className="h-12 w-12 text-white hover:opacity-90 disabled:opacity-30 transition-all"
+            style={{
+              background: `linear-gradient(135deg, ${userColor}, ${userColor}cc)`,
+              boxShadow: `0 0 15px ${userColor}40`,
+            }}
           >
-            {isSending ? (
+            {isSending || isUploading ? (
               <SixLoader size="sm" />
             ) : (
               <Send className="w-5 h-5" />

@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Clock } from "lucide-react";
+import { Clock, Eye, EyeOff, ImageIcon, Play } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 interface Message {
   id: string;
@@ -12,11 +13,15 @@ interface Message {
   read_at: string | null;
   expires_at: string | null;
   created_at: string;
+  media_url?: string;
+  media_type?: "image" | "video";
+  is_media_revealed?: boolean;
 }
 
 interface MessageBubbleProps {
   message: Message;
   isOwn: boolean;
+  userColor: string;
   onRead: () => void;
 }
 
@@ -55,17 +60,161 @@ function AshParticle({ index, color }: { index: number; color: string }) {
   );
 }
 
-export function MessageBubble({ message, isOwn, onRead }: MessageBubbleProps) {
+// Media preview component with Tap-to-Reveal
+function MediaPreview({
+  message,
+  isOwn,
+  userColor,
+}: {
+  message: Message;
+  isOwn: boolean;
+  userColor: string;
+}) {
+  const [isRevealed, setIsRevealed] = useState(message.is_media_revealed || false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleReveal = async () => {
+    if (isOwn || isRevealed || isLoading) return;
+
+    setIsLoading(true);
+    try {
+      const supabase = createClient();
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 6 * 60 * 1000);
+
+      await supabase
+        .from("messages")
+        .update({
+          is_media_revealed: true,
+          is_read: true,
+          read_at: now.toISOString(),
+          expires_at: expiresAt.toISOString(),
+        })
+        .eq("id", message.id);
+
+      setIsRevealed(true);
+    } catch (error) {
+      console.error("Failed to reveal media:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update local state when message updates
+  useEffect(() => {
+    setIsRevealed(message.is_media_revealed || false);
+  }, [message.is_media_revealed]);
+
+  if (!isRevealed) {
+    return (
+      <motion.button
+        onClick={handleReveal}
+        disabled={isOwn || isLoading}
+        className={cn(
+          "relative w-full aspect-[4/3] rounded-xl overflow-hidden",
+          "flex flex-col items-center justify-center gap-3",
+          "transition-all duration-300",
+          isOwn ? "cursor-default" : "cursor-pointer hover:scale-[1.02]"
+        )}
+        style={{
+          background: `linear-gradient(135deg, ${userColor}20, ${userColor}40)`,
+          border: `2px dashed ${userColor}60`,
+        }}
+        whileHover={!isOwn ? { scale: 1.02 } : {}}
+        whileTap={!isOwn ? { scale: 0.98 } : {}}
+      >
+        {/* Blur overlay */}
+        <div
+          className="absolute inset-0 backdrop-blur-md"
+          style={{ backgroundColor: `${userColor}10` }}
+        />
+
+        <div className="relative z-10 flex flex-col items-center gap-2">
+          {message.media_type === "video" ? (
+            <Play size={32} style={{ color: userColor }} />
+          ) : (
+            <ImageIcon size={32} style={{ color: userColor }} />
+          )}
+
+          {isOwn ? (
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <EyeOff size={14} />
+              <span>未開封</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-sm" style={{ color: userColor }}>
+              <Eye size={14} />
+              <span>{isLoading ? "開封中..." : "タップして開封"}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Animated border glow */}
+        {!isOwn && (
+          <motion.div
+            className="absolute inset-0 rounded-xl pointer-events-none"
+            style={{
+              boxShadow: `0 0 20px ${userColor}40, inset 0 0 20px ${userColor}20`,
+            }}
+            animate={{
+              boxShadow: [
+                `0 0 20px ${userColor}40, inset 0 0 20px ${userColor}20`,
+                `0 0 30px ${userColor}60, inset 0 0 30px ${userColor}30`,
+                `0 0 20px ${userColor}40, inset 0 0 20px ${userColor}20`,
+              ],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+        )}
+      </motion.button>
+    );
+  }
+
+  return (
+    <div className="w-full rounded-xl overflow-hidden">
+      {message.media_type === "video" ? (
+        <video
+          src={message.media_url}
+          controls
+          autoPlay
+          muted
+          playsInline
+          className="w-full h-auto rounded-xl"
+          style={{
+            boxShadow: `0 0 20px ${userColor}40`,
+          }}
+        />
+      ) : (
+        <img
+          src={message.media_url}
+          alt="Shared media"
+          className="w-full h-auto rounded-xl"
+          style={{
+            boxShadow: `0 0 20px ${userColor}40`,
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubbleProps) {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isDissolving, setIsDissolving] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
 
-  // Mark as read when viewing other's messages
+  const isMediaMessage = !!message.media_url;
+
+  // Mark as read when viewing other's text messages
   useEffect(() => {
-    if (!isOwn && !message.is_read) {
+    if (!isOwn && !message.is_read && !isMediaMessage) {
       onRead();
     }
-  }, [isOwn, message.is_read, onRead]);
+  }, [isOwn, message.is_read, isMediaMessage, onRead]);
 
   // Countdown timer for read messages
   useEffect(() => {
@@ -112,16 +261,14 @@ export function MessageBubble({ message, isOwn, onRead }: MessageBubbleProps) {
 
   const isUrgent = timeLeft !== null && timeLeft <= 60;
   const isCritical = timeLeft !== null && timeLeft <= 10;
-  const bubbleColor = isOwn ? "#1a1a1a" : "#1f1f1f";
-  const ashColor = isOwn ? "#666" : "#888";
 
-  // Generate ash particles
+  // Generate ash particles with user color
   const ashParticles = useMemo(
     () =>
       Array.from({ length: 30 }, (_, i) => (
-        <AshParticle key={i} index={i} color={ashColor} />
+        <AshParticle key={i} index={i} color={userColor} />
       )),
-    [ashColor]
+    [userColor]
   );
 
   return (
@@ -151,12 +298,17 @@ export function MessageBubble({ message, isOwn, onRead }: MessageBubbleProps) {
 
         <div
           className={cn(
-            "max-w-[80%] rounded-2xl px-4 py-2.5 space-y-1 relative overflow-hidden",
-            isOwn
-              ? "bg-gradient-to-br from-foreground to-foreground/90 text-background rounded-br-md"
-              : "bg-gradient-to-br from-secondary to-secondary/80 text-foreground rounded-bl-md",
+            "max-w-[80%] rounded-2xl px-4 py-2.5 space-y-2 relative overflow-hidden",
+            isOwn ? "rounded-br-md" : "rounded-bl-md",
             isDissolving && "opacity-50"
           )}
+          style={{
+            background: isOwn
+              ? `linear-gradient(135deg, ${userColor}30, ${userColor}15)`
+              : `linear-gradient(135deg, ${userColor}20, ${userColor}10)`,
+            borderLeft: isOwn ? "none" : `3px solid ${userColor}`,
+            borderRight: isOwn ? `3px solid ${userColor}` : "none",
+          }}
         >
           {/* Urgent glow effect */}
           {isUrgent && !isDissolving && (
@@ -164,8 +316,8 @@ export function MessageBubble({ message, isOwn, onRead }: MessageBubbleProps) {
               className="absolute inset-0 rounded-2xl pointer-events-none"
               style={{
                 boxShadow: isCritical
-                  ? "inset 0 0 20px rgba(255, 45, 146, 0.4), 0 0 20px rgba(255, 45, 146, 0.2)"
-                  : "inset 0 0 15px rgba(212, 38, 255, 0.3)",
+                  ? `inset 0 0 20px ${userColor}60, 0 0 20px ${userColor}40`
+                  : `inset 0 0 15px ${userColor}40`,
               }}
               animate={{
                 opacity: [0.5, 1, 0.5],
@@ -177,14 +329,19 @@ export function MessageBubble({ message, isOwn, onRead }: MessageBubbleProps) {
             />
           )}
 
-          <p className="text-sm leading-relaxed break-words relative z-10">
-            {message.content}
-          </p>
+          {/* Media content */}
+          {isMediaMessage ? (
+            <MediaPreview message={message} isOwn={isOwn} userColor={userColor} />
+          ) : (
+            <p className="text-sm leading-relaxed break-words relative z-10 text-foreground">
+              {message.content}
+            </p>
+          )}
 
           <div
             className={cn(
-              "flex items-center gap-2 text-[10px] relative z-10",
-              isOwn ? "text-background/60 justify-end" : "text-muted-foreground"
+              "flex items-center gap-2 text-[10px] relative z-10 text-muted-foreground",
+              isOwn ? "justify-end" : "justify-start"
             )}
           >
             <span className="font-mono">{formatCreatedAt(message.created_at)}</span>
@@ -193,10 +350,11 @@ export function MessageBubble({ message, isOwn, onRead }: MessageBubbleProps) {
             {timeLeft !== null && (
               <motion.span
                 className={cn(
-                  "flex items-center gap-0.5 font-mono tabular-nums tracking-wider",
-                  isCritical && "text-six-pink",
-                  isUrgent && !isCritical && "text-six-purple"
+                  "flex items-center gap-0.5 font-mono tabular-nums tracking-wider"
                 )}
+                style={{
+                  color: isCritical ? "#ff2d92" : isUrgent ? userColor : undefined,
+                }}
                 animate={
                   isUrgent
                     ? {
@@ -218,7 +376,7 @@ export function MessageBubble({ message, isOwn, onRead }: MessageBubbleProps) {
             {/* Read status for own messages */}
             {isOwn && (
               <span className="font-sans">
-                {message.is_read ? "既読" : "未読"}
+                {message.is_read || message.is_media_revealed ? "既読" : "未読"}
               </span>
             )}
           </div>

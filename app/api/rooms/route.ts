@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { creator_uuid } = body;
+    const { creator_uuid, creator_color } = body;
 
     if (!creator_uuid) {
       return NextResponse.json(
@@ -15,11 +15,12 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // Create new room with UUID
+    // Create new room with UUID and color
     const { data: room, error } = await supabase
       .from("rooms")
       .insert({
         creator_uuid,
+        creator_color: creator_color || "#ff2d92",
         creator_ip: "uuid-based", // Keep for backwards compatibility
         status: "active",
         closes_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(), // 6 days
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { room_id, guest_uuid } = body;
+    const { room_id, guest_uuid, guest_color } = body;
 
     if (!room_id || !guest_uuid) {
       return NextResponse.json(
@@ -131,11 +132,12 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Update room with guest UUID
+    // Update room with guest UUID and color
     const { data: room, error } = await supabase
       .from("rooms")
       .update({
         guest_uuid,
+        guest_color: guest_color || "#d426ff",
         guest_ip: "uuid-based", // Keep for backwards compatibility
         last_activity_at: new Date().toISOString(),
       })
