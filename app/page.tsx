@@ -20,7 +20,7 @@ export default function HomePage() {
   const [roomCode, setRoomCode] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [userUUID, setUserUUID] = useState<string>("");
-  const [selectedColor, setSelectedColor] = useState(SIX_COLORS[0].hex);
+  const [selectedColor, setSelectedColor] = useState<string>(SIX_COLORS[0].hex);
 
   // Get or create user UUID on mount
   useEffect(() => {
