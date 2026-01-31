@@ -128,7 +128,21 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
         .eq("room_id", roomId)
         .order("created_at", { ascending: true });
 
-      setMessages(messagesData || []);
+      // Filter out already-expired messages on initial load
+      const now = new Date();
+      const validMessages = (messagesData || []).filter((msg: Message) => {
+        if (!msg.expires_at) return true;
+        const expiresAt = new Date(msg.expires_at);
+        return expiresAt > now;
+      });
+
+      console.log("[v0] Loaded messages:", {
+        total: messagesData?.length || 0,
+        valid: validMessages.length,
+        filtered: (messagesData?.length || 0) - validMessages.length,
+      });
+
+      setMessages(validMessages);
       setIsLoading(false);
     };
 
@@ -146,13 +160,24 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
         },
         (payload) => {
           if (payload.eventType === "INSERT") {
-            setMessages((prev) => [...prev, payload.new as Message]);
+            const newMessage = payload.new as Message;
+            // Only add if not expired
+            if (!newMessage.expires_at || new Date(newMessage.expires_at) > new Date()) {
+              setMessages((prev) => [...prev, newMessage]);
+            }
           } else if (payload.eventType === "UPDATE") {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === payload.new.id ? (payload.new as Message) : msg
-              )
-            );
+            const updatedMessage = payload.new as Message;
+            // Only keep if not expired
+            if (!updatedMessage.expires_at || new Date(updatedMessage.expires_at) > new Date()) {
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === updatedMessage.id ? updatedMessage : msg
+                )
+              );
+            } else {
+              // Remove if now expired
+              setMessages((prev) => prev.filter((msg) => msg.id !== updatedMessage.id));
+            }
           } else if (payload.eventType === "DELETE") {
             setMessages((prev) =>
               prev.filter((msg) => msg.id !== payload.old.id)
@@ -489,7 +514,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
 
       {/* Input */}
       <motion.div
-        className="border-t border-border/50 p-4 shrink-0 backdrop-blur-sm bg-background/80 safe-bottom"
+        className="border-t border-border/50 p-4 pb-6 mb-4 shrink-0 backdrop-blur-sm bg-background/80 safe-bottom"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >

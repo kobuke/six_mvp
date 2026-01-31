@@ -218,12 +218,22 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
 
   // Countdown timer for read messages
   useEffect(() => {
-    if (!message.expires_at) return;
+    if (!message.expires_at) {
+      setTimeLeft(null);
+      return;
+    }
 
     const updateTimer = () => {
       const now = new Date().getTime();
       const expires = new Date(message.expires_at!).getTime();
       const remaining = Math.max(0, Math.floor((expires - now) / 1000));
+
+      console.log("[v0] Message timer update:", {
+        messageId: message.id,
+        remaining,
+        expires: message.expires_at,
+        now: new Date().toISOString(),
+      });
 
       if (remaining <= 0) {
         setIsDissolving(true);
@@ -238,7 +248,7 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
-  }, [message.expires_at]);
+  }, [message.expires_at, message.id]);
 
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
