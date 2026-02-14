@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { Clock } from "lucide-react";
 
 interface RoomStatusProps {
@@ -9,6 +10,7 @@ interface RoomStatusProps {
 
 export function RoomStatus({ closesAt }: RoomStatusProps) {
   const [timeLeft, setTimeLeft] = useState<string>("");
+  const [isUrgent, setIsUrgent] = useState(false);
 
   useEffect(() => {
     const updateTimer = () => {
@@ -18,12 +20,16 @@ export function RoomStatus({ closesAt }: RoomStatusProps) {
 
       if (remaining <= 0) {
         setTimeLeft("閉鎖済み");
+        setIsUrgent(true);
         return;
       }
 
       const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
       const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+
+      // Urgent if less than 1 day remaining
+      setIsUrgent(days < 1);
 
       if (days > 0) {
         setTimeLeft(`残り${days}日${hours}時間`);
@@ -35,15 +41,21 @@ export function RoomStatus({ closesAt }: RoomStatusProps) {
     };
 
     updateTimer();
-    const interval = setInterval(updateTimer, 60000); // Update every minute
+    const interval = setInterval(updateTimer, 60000);
 
     return () => clearInterval(interval);
   }, [closesAt]);
 
   return (
-    <span className="flex items-center gap-1">
+    <motion.span
+      className={`flex items-center gap-1 font-mono text-[10px] tabular-nums ${
+        isUrgent ? "text-six-pink" : "text-muted-foreground"
+      }`}
+      animate={isUrgent ? { opacity: [1, 0.5, 1] } : {}}
+      transition={{ duration: 1.5, repeat: Infinity }}
+    >
       <Clock className="w-3 h-3" />
       {timeLeft}
-    </span>
+    </motion.span>
   );
 }

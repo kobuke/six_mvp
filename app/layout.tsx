@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -7,16 +7,24 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
+
 export const metadata: Metadata = {
-  title: "SiX - 6分で消える、6日で閉じる",
-  description: "読んだら6分で消えるメッセージ。6日後に部屋は閉じる。痕跡を残さない、二人だけの特別な空間。",
+  title: "SiX - 6分で消える、6時間で閉じる",
+  description: "読んだら6分で消えるメッセージ。6時間後に部屋は閉じる。痕跡を残さない、二人だけの特別な空間。",
   keywords: ["chat", "ephemeral", "privacy", "secure messaging", "SiX"],
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -25,8 +33,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja">
-      <body className={`${inter.variable} font-sans antialiased`}>
+    <html lang="ja" className="h-dvh">
+      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased h-dvh overflow-hidden`}>
         {children}
       </body>
     </html>
