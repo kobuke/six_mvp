@@ -30,6 +30,8 @@ export default function HomePage() {
 
     setIsCreating(true);
     try {
+      const key = await generateRoomKey();
+
       const response = await fetch("/api/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -40,7 +42,8 @@ export default function HomePage() {
       });
       const data = await response.json();
       if (data.roomId) {
-        router.push(`/room/${data.roomId}`);
+        // Redirect with encryption key in hash
+        router.push(`/room/${data.roomId}#${key}`);
       }
     } catch (error) {
       console.error("Failed to create room:", error);
