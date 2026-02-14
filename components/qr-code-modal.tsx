@@ -9,14 +9,15 @@ interface QRCodeModalProps {
   open: boolean;
   onClose: () => void;
   roomId: string;
+  encryptionKey?: string;
 }
 
-export function QRCodeModal({ open, onClose, roomId }: QRCodeModalProps) {
+export function QRCodeModal({ open, onClose, roomId, encryptionKey }: QRCodeModalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [copied, setCopied] = useState(false);
 
-  const roomUrl = typeof window !== "undefined" 
-    ? `${window.location.origin}/room/${roomId}` 
+  const roomUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/room/${roomId}${encryptionKey ? `#${encryptionKey}` : ""}`
     : "";
 
   useEffect(() => {
@@ -30,7 +31,7 @@ export function QRCodeModal({ open, onClose, roomId }: QRCodeModalProps) {
       if (!ctx) return;
 
       const QRCode = (await import("qrcode")).default;
-      
+
       await QRCode.toCanvas(canvas, roomUrl, {
         width: 256,
         margin: 2,
@@ -55,14 +56,14 @@ export function QRCodeModal({ open, onClose, roomId }: QRCodeModalProps) {
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Backdrop */}
-          <motion.div 
+          <motion.div
             className="absolute inset-0 bg-background/90 backdrop-blur-md"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          
+
           {/* Modal */}
           <motion.div
             className="relative bg-card/50 border border-border/50 rounded-2xl p-6 w-full max-w-sm mx-4 space-y-6 backdrop-blur-xl"

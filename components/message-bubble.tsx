@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Clock, Eye, EyeOff, ImageIcon, Play } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { decryptMessage } from "@/lib/crypto";
 
 interface Message {
   id: string;
@@ -23,6 +24,7 @@ interface MessageBubbleProps {
   isOwn: boolean;
   userColor: string;
   onRead: () => void;
+  encryptionKey?: string;
 }
 
 // Ash particle component for dissolution effect
@@ -202,10 +204,32 @@ function MediaPreview({
   );
 }
 
-export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubbleProps) {
+export function MessageBubble({ message, isOwn, userColor, onRead, encryptionKey }: MessageBubbleProps) {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isDissolving, setIsDissolving] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
+  const [decryptedContent, setDecryptedContent] = useState(
+    message.content.startsWith("v1:") ? "" : message.content
+  );
+  const [decryptedMediaUrl, setDecryptedMediaUrl] = useState(
+    message.media_url?.startsWith("v1:") ? "" : message.media_url
+  );
+
+  useEffect(() => {
+    async function decrypt() {
+      if (message.content) {
+        // Only decrypt if it looks encrypted (v1:) or we want to try generic decrypt
+        // decryptMessage handles "v1:" check and legacy fallback
+        const text = await decryptMessage(message.content, encryptionKey || "");
+        setDecryptedContent(text);
+      }
+      if (message.media_url) {
+        const url = await decryptMessage(message.media_url, encryptionKey || "");
+        setDecryptedMediaUrl(url);
+      }
+    }
+    decrypt();
+  }, [message.content, message.media_url, encryptionKey]);
 
   const isMediaMessage = !!message.media_url;
 
@@ -338,10 +362,14 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
 
           {/* Media content */}
           {isMediaMessage ? (
-            <MediaPreview message={message} isOwn={isOwn} userColor={userColor} />
+            <MediaPreview
+              message={{ ...message, media_url: decryptedMediaUrl }}
+              isOwn={isOwn}
+              userColor={userColor}
+            />
           ) : (
             <p className="text-sm leading-relaxed break-words relative z-10 text-foreground whitespace-pre-wrap">
-              {message.content}
+              {decryptedContent}
             </p>
           )}
 
@@ -365,9 +393,9 @@ export function MessageBubble({ message, isOwn, userColor, onRead }: MessageBubb
                 animate={
                   isUrgent
                     ? {
-                        opacity: [1, 0.4, 1],
-                        scale: isCritical ? [1, 1.1, 1] : [1, 1.05, 1],
-                      }
+                      opacity: [1, 0.4, 1],
+                      scale: isCritical ? [1, 1.1, 1] : [1, 1.05, 1],
+                    }
                     : {}
                 }
                 transition={{

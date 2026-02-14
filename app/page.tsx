@@ -8,7 +8,7 @@ import { Plus } from "lucide-react";
 import { SixLoader } from "@/components/six-loader";
 import { ColorPicker, SIX_COLORS } from "@/components/color-picker";
 import { RoomHistoryList } from "@/components/room-history-list";
-import { getUserUUID } from "@/lib/crypto";
+import { getUserUUID, generateRoomKey } from "@/lib/crypto";
 
 type Step = "lobby" | "create";
 
@@ -27,13 +27,13 @@ export default function HomePage() {
 
   const createRoom = async () => {
     if (!userUUID) return;
-    
+
     setIsCreating(true);
     try {
       const response = await fetch("/api/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           creator_uuid: userUUID,
           creator_color: selectedColor,
         }),
@@ -53,7 +53,7 @@ export default function HomePage() {
     <main className="h-dvh flex flex-col items-center justify-center px-4 overflow-hidden">
       {/* Animated background grid */}
       <div className="fixed inset-0 bg-grid-six pointer-events-none" />
-      
+
       {/* Gradient orbs */}
       <motion.div
         className="fixed top-1/4 -left-32 w-64 h-64 bg-six-pink/10 rounded-full blur-3xl"
@@ -107,7 +107,7 @@ export default function HomePage() {
               </div>
 
               {/* Room History */}
-              <RoomHistoryList onRoomSelect={() => {}} />
+              <RoomHistoryList onRoomSelect={() => { }} />
 
               {/* Footer */}
               <footer className="text-center">

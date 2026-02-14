@@ -13,7 +13,7 @@ import { QRCodeModal } from "@/components/qr-code-modal";
 import { MessageBubble } from "@/components/message-bubble";
 import { RoomStatus } from "@/components/room-status";
 import { SixLoader, SixLoadingScreen } from "@/components/six-loader";
-import { getUserUUID } from "@/lib/crypto";
+import { getUserUUID, encryptMessage, KEY_STORAGE_PREFIX } from "@/lib/crypto";
 import { addToRoomHistory, updateLastMessageAt, updateRoomName } from "@/lib/room-history";
 import { NotificationPermissionDialog, sendNotification } from "@/components/notification-permission-dialog";
 import { TypingIndicator } from "@/components/typing-indicator";
@@ -77,6 +77,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTypingBroadcastRef = useRef<number>(0);
   const supabase = createClient();
+  const [encryptionKey, setEncryptionKey] = useState<string | null>(null);
 
   // Get user's color based on their role in the room
   const getUserColor = () => {
@@ -103,10 +104,38 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
     setUserUUID(uuid);
   }, []);
 
+  // Handle Encryption Key
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Check URL hash first
+    const hash = window.location.hash.slice(1);
+    const storageKey = `${KEY_STORAGE_PREFIX}${roomId}`;
+
+    if (hash) {
+      setEncryptionKey(hash);
+      localStorage.setItem(storageKey, hash);
+      // Clean up URL hash visually (optional, but effectively hides key)
+      // window.history.replaceState(null, "", window.location.pathname);
+      // Actually, keeping strictly in URL is good for sharing via copy-paste of URL bar
+      // But we have copy button.
+      // Let's keep it in URL for now so reload works without localStorage dependency if shared fresh.
+    } else {
+      // Try local storage
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        setEncryptionKey(stored);
+      } else {
+        console.warn("No encryption key found.");
+        // We could show error here.
+      }
+    }
+  }, [roomId]);
+
   // Check notification permission on first visit
   useEffect(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
-    
+
     const hasAsked = localStorage.getItem("six_notification_asked");
     if (!hasAsked && Notification.permission === "default") {
       // Show dialog after a short delay
@@ -144,7 +173,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
       const isCreator = roomData.creator_uuid === userUUID;
       const isGuest = roomData.guest_uuid === userUUID;
       const isFull = roomData.guest_uuid && !isCreator && !isGuest;
-      
+
       if (isFull) {
         setIsRoomFull(true);
         setIsLoading(false);
@@ -214,7 +243,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
               setMessages((prev) => [...prev, newMessage]);
               // Update last message time in history
               updateLastMessageAt(roomId, newMessage.created_at);
-              
+
               // Send notification for messages from others
               if (newMessage.sender_uuid !== userUUID) {
                 const content = newMessage.content || "新しいメディアが届きました";
@@ -273,7 +302,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
         if (payload.payload.user_uuid !== userUUID) {
           setIsPartnerTyping(true);
           setPartnerColor(payload.payload.color);
-          
+
           // Clear typing after 2 seconds of no activity
           if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
@@ -316,11 +345,11 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
             guest_color: guestColor,
           }),
         });
-        
+
         if (response.ok) {
           const updatedRoom = await response.json();
           setRoom(updatedRoom);
-          
+
           // Update room history with color
           addToRoomHistory({
             roomId: updatedRoom.id,
@@ -377,13 +406,16 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
 
       const { url, mediaType } = await response.json();
 
+      // Encrypt media URL
+      const encryptedUrl = await encryptMessage(url, encryptionKey || "");
+
       // Send message with media
       await supabase.from("messages").insert({
         room_id: roomId,
         sender_uuid: userUUID,
         sender_ip: "uuid-based",
         content: "",
-        media_url: url,
+        media_url: encryptedUrl,
         media_type: mediaType,
         is_media_revealed: false,
       });
@@ -404,11 +436,14 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
     if (!newMessage.trim() || !room || isSending || !userUUID) return;
 
     setIsSending(true);
+
+    const encryptedContent = await encryptMessage(newMessage.trim(), encryptionKey || "");
+
     const { error } = await supabase.from("messages").insert({
       room_id: roomId,
       sender_uuid: userUUID,
       sender_ip: "uuid-based",
-      content: newMessage.trim(),
+      content: encryptedContent,
     });
 
     if (!error) {
@@ -437,7 +472,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   };
 
   const copyRoomLink = async () => {
-    const link = `${window.location.origin}/room/${roomId}`;
+    const link = `${window.location.origin}/room/${roomId}${encryptionKey ? `#${encryptionKey}` : ""}`;
     await navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -464,7 +499,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setNewMessage(e.target.value);
     broadcastTyping();
-    
+
     // Auto-resize
     const textarea = e.target;
     textarea.style.height = "auto";
@@ -478,7 +513,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
     // Plain Enter always creates a new line on all devices
     const isCtrlOrCmd = e.ctrlKey || e.metaKey;
     const isEnter = e.key === "Enter";
-    
+
     // Cmd/Ctrl+Enter sends message
     if (isEnter && isCtrlOrCmd && !e.shiftKey) {
       e.preventDefault();
@@ -766,6 +801,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
               isOwn={isOwnMessage(message)}
               userColor={getMessageColor(message)}
               onRead={() => markAsRead(message.id)}
+              encryptionKey={encryptionKey || undefined}
             />
           ))}
         </AnimatePresence>
@@ -835,7 +871,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
             onChange={handleFileSelect}
             className="hidden"
           />
-          
+
           {/* Media button */}
           <Button
             type="button"
