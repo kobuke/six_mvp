@@ -36,6 +36,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Increment global room stats
+    // We don't await/block for this, just fire and forget or catch error
+    // But since it's serverless, better await it to ensure it runs before freeze
+    try {
+      await supabase.rpc("increment_room_count");
+    } catch (statError) {
+      console.error("Failed to increment room stats:", statError);
+    }
+
     return NextResponse.json({ roomId: room.id, room });
   } catch (error) {
     console.error("Error in POST /api/rooms:", error);

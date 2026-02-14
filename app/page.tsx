@@ -9,6 +9,8 @@ import { SixLoader } from "@/components/six-loader";
 import { ColorPicker, SIX_COLORS } from "@/components/color-picker";
 import { RoomHistoryList } from "@/components/room-history-list";
 import { getUserUUID, generateRoomKey } from "@/lib/crypto";
+import { createClient } from "@/lib/supabase/client";
+import { useSpring, useTransform } from "framer-motion";
 
 type Step = "lobby" | "create";
 
@@ -18,12 +20,33 @@ export default function HomePage() {
   const [isCreating, setIsCreating] = useState(false);
   const [userUUID, setUserUUID] = useState<string>("");
   const [selectedColor, setSelectedColor] = useState<string>(SIX_COLORS[0].hex);
+  const [roomCount, setRoomCount] = useState<number | null>(null);
 
-  // Get or create user UUID on mount
+  // Animation for room count
+  const countSpring = useSpring(0, { stiffness: 50, damping: 20 });
+  const countDisplay = useTransform(countSpring, (current) => Math.round(current).toLocaleString());
+
+  // Get or create user UUID on mount & Fetch room count
   useEffect(() => {
     const uuid = getUserUUID();
     setUserUUID(uuid);
+
+    const fetchStats = async () => {
+      const supabase = createClient();
+      const { data } = await supabase.from("room_stats").select("total_created").single();
+      if (data?.total_created !== undefined) {
+        setRoomCount(data.total_created);
+      }
+    };
+    fetchStats();
   }, []);
+
+  // Update spring when roomCount changes
+  useEffect(() => {
+    if (roomCount !== null) {
+      countSpring.set(roomCount);
+    }
+  }, [roomCount, countSpring]);
 
   const createRoom = async () => {
     if (!userUUID) return;
@@ -100,6 +123,19 @@ export default function HomePage() {
 
               {/* Action Buttons */}
               <div className="space-y-4">
+                {roomCount !== null && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="text-center"
+                  >
+                    <p className="text-sm text-muted-foreground/80 font-light">
+                      これまでに <motion.span className="text-lg font-medium text-foreground mx-1">{countDisplay}</motion.span> 個の秘密の部屋が作成されています
+                    </p>
+                  </motion.div>
+                )}
+
                 <Button
                   onClick={() => setStep("create")}
                   className="w-full h-16 text-lg font-medium bg-gradient-to-r from-six-pink to-six-purple text-white hover:opacity-90 transition-all animate-glow-pulse"
