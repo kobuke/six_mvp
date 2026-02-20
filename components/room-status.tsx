@@ -19,7 +19,7 @@ export function RoomStatus({ closesAt }: RoomStatusProps) {
       const remaining = Math.max(0, closes - now);
 
       if (remaining <= 0) {
-        setTimeLeft("閉鎖済み");
+        setTimeLeft("Closed");
         setIsUrgent(true);
         return;
       }
@@ -32,11 +32,11 @@ export function RoomStatus({ closesAt }: RoomStatusProps) {
       setIsUrgent(days < 1);
 
       if (days > 0) {
-        setTimeLeft(`残り${days}日${hours}時間`);
+        setTimeLeft(`${days}d ${hours}h left`);
       } else if (hours > 0) {
-        setTimeLeft(`残り${hours}時間${minutes}分`);
+        setTimeLeft(`${hours}h ${minutes}m left`);
       } else {
-        setTimeLeft(`残り${minutes}分`);
+        setTimeLeft(`${minutes}m left`);
       }
     };
 
@@ -48,9 +48,8 @@ export function RoomStatus({ closesAt }: RoomStatusProps) {
 
   return (
     <motion.span
-      className={`flex items-center gap-1 font-mono text-[10px] tabular-nums ${
-        isUrgent ? "text-six-pink" : "text-muted-foreground"
-      }`}
+      className={`flex items-center gap-1 font-mono text-[10px] tabular-nums ${isUrgent ? "text-six-pink" : "text-muted-foreground"
+        }`}
       animate={isUrgent ? { opacity: [1, 0.5, 1] } : {}}
       transition={{ duration: 1.5, repeat: Infinity }}
     >

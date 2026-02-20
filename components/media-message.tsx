@@ -102,27 +102,27 @@ export function MediaMessage({
             whileTap={!isOwn ? { scale: 0.98 } : {}}
           >
             {/* Blur overlay effect */}
-            <div 
+            <div
               className="absolute inset-0 backdrop-blur-md"
               style={{ backgroundColor: `${userColor}10` }}
             />
-            
+
             <div className="relative z-10 flex flex-col items-center gap-2">
               {mediaType === "image" ? (
                 <ImageIcon size={32} style={{ color: userColor }} />
               ) : (
                 <Play size={32} style={{ color: userColor }} />
               )}
-              
+
               {isOwn ? (
                 <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <EyeOff size={14} />
-                  <span>未開封</span>
+                  <span>Unopened</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5 text-sm" style={{ color: userColor }}>
                   <Eye size={14} />
-                  <span>{isLoading ? "開封中..." : "タップして開封"}</span>
+                  <span>{isLoading ? "Opening..." : "Tap to reveal"}</span>
                 </div>
               )}
             </div>

@@ -15,20 +15,20 @@ export function NotificationPermissionDialog({
 }: NotificationPermissionDialogProps) {
   const handleAllow = async () => {
     localStorage.setItem("six_notification_asked", "true");
-    
+
     try {
       const permission = await Notification.requestPermission();
       if (permission === "granted") {
         // Show a test notification
         new Notification("SiX", {
-          body: "通知が有効になりました",
+          body: "Notifications are now enabled",
           icon: "/icon-192.png",
         });
       }
     } catch (error) {
       console.error("Notification permission error:", error);
     }
-    
+
     onClose();
   };
 
@@ -105,12 +105,12 @@ export function NotificationPermissionDialog({
                 {/* Content */}
                 <div className="relative text-center space-y-2">
                   <h3 className="text-lg font-medium">
-                    メッセージを逃さないために
+                    Never miss a message
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    6分で消えるメッセージ。<br />
-                    通知を許可すると、相手からの<br />
-                    メッセージを見逃しません。
+                    Messages disappear in 6 minutes.<br />
+                    Enable notifications so you never<br />
+                    miss a message from your partner.
                   </p>
                 </div>
               </div>
@@ -121,14 +121,14 @@ export function NotificationPermissionDialog({
                   onClick={handleAllow}
                   className="w-full h-12 text-white font-medium bg-gradient-to-r from-six-pink to-six-purple hover:opacity-90 transition-opacity"
                 >
-                  通知を許可する
+                  Allow Notifications
                 </Button>
                 <Button
                   onClick={handleDeny}
                   variant="ghost"
                   className="w-full h-10 text-muted-foreground hover:text-foreground"
                 >
-                  あとで
+                  Later
                 </Button>
               </div>
 

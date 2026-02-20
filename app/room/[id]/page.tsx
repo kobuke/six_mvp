@@ -158,13 +158,13 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
         .single();
 
       if (roomError || !roomData) {
-        setError("この部屋は存在しないか、既に閉鎖されています");
+        setError("This room does not exist or has already been closed");
         setIsLoading(false);
         return;
       }
 
       if (new Date(roomData.closes_at) < new Date()) {
-        setError("この部屋は既に閉鎖されています");
+        setError("This room has already been closed");
         setIsLoading(false);
         return;
       }
@@ -246,7 +246,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
 
               // Send notification for messages from others
               if (newMessage.sender_uuid !== userUUID) {
-                const content = newMessage.content || "新しいメディアが届きました";
+                const content = newMessage.content || "New media received";
                 sendNotification("SiX", content.substring(0, 50));
                 // Clear typing indicator when they send
                 setIsPartnerTyping(false);
@@ -373,13 +373,13 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
     // Validate file type
     const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4", "video/webm", "video/quicktime"];
     if (!validTypes.includes(file.type)) {
-      alert("画像またはビデオファイルのみ送信できます");
+      alert("Only image or video files can be sent");
       return;
     }
 
     // Validate file size (10MB max)
     if (file.size > 10 * 1024 * 1024) {
-      alert("ファイルサイズは10MB以下にしてください");
+      alert("File size must be 10MB or less");
       return;
     }
 
@@ -426,7 +426,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
       }
     } catch (error) {
       console.error("Upload error:", error);
-      alert("アップロードに失敗しました");
+      alert("Upload failed");
     } finally {
       setIsUploading(false);
     }
@@ -581,7 +581,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
       setMessages(validMessages);
     } catch (error) {
       console.error("Failed to join room:", error);
-      setError("部屋への参加に失敗しました");
+      setError("Failed to join the room");
       setShowGuestColorPicker(false);
     }
   };
@@ -654,10 +654,10 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
             Full Room
           </h1>
           <p className="text-muted-foreground">
-            この部屋にはもう入れません
+            This room is full
           </p>
           <p className="text-xs text-muted-foreground/60">
-            6秒後にトップへ戻ります...
+            Redirecting to home in 6 seconds...
           </p>
         </motion.div>
       </main>
@@ -673,14 +673,14 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
           animate={{ opacity: 1, y: 0 }}
         >
           <h1 className="text-2xl font-light text-foreground">
-            部屋が見つかりません
+            Room Not Found
           </h1>
           <p className="text-muted-foreground">{error}</p>
         </motion.div>
         <Link href="/">
           <Button variant="outline" className="gap-2 border-border hover:border-six-pink/50 hover:bg-six-pink/10">
             <ArrowLeft className="w-4 h-4" />
-            ホームに戻る
+            Back to Home
           </Button>
         </Link>
       </main>
@@ -781,12 +781,12 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
               <div className="space-y-2">
                 <p className="text-muted-foreground">
                   {isCreator
-                    ? "相手を待っています..."
-                    : "最初のメッセージを送信しましょう"}
+                    ? "Waiting for the other person..."
+                    : "Send the first message"}
                 </p>
                 {isCreator && !room?.guest_uuid && (
                   <p className="text-xs text-muted-foreground/60">
-                    URLまたはQRコードを共有して相手を招待してください
+                    Share the URL or QR code to invite someone
                   </p>
                 )}
               </div>
@@ -892,7 +892,7 @@ export default function ChatRoomPage({ params }: { params: Promise<{ id: string 
               value={newMessage}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
-              placeholder="メッセージを入力..."
+              placeholder="Type a message..."
               disabled={!!selectedFile}
               rows={1}
               className="min-h-[48px] max-h-[120px] resize-none bg-secondary/50 border-border/50 focus:border-six-pink/50 focus:ring-six-pink/20 transition-all disabled:opacity-50 py-3"

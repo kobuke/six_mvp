@@ -14,7 +14,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "SIX",
-  description: "読んだら6分で消えるメッセージ。6時間後に部屋は閉じる。痕跡を残さない、二人だけの特別な空間。",
+  description: "Messages disappear 6 minutes after reading. Rooms close after 6 hours. A private space for two, leaving no trace.",
   icons: {
     icon: "/favicon.png",
     apple: "/apple-icon.png",
@@ -37,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja" className="h-dvh">
+    <html lang="en" className="h-dvh">
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased h-dvh overflow-hidden`}>
         {children}
       </body>

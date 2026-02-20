@@ -60,7 +60,7 @@ export function ColorPicker({
             }}
             whileHover={!isDisabled ? { scale: 1.1 } : {}}
             whileTap={!isDisabled ? { scale: 0.95 } : {}}
-            title={isDisabled ? "相手が選択中" : color.name}
+            title={isDisabled ? "Selected by partner" : color.name}
           >
             {isSelected && (
               <motion.div

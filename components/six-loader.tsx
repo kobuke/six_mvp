@@ -110,7 +110,7 @@ export function SixLoader({ size = "md", className = "" }: SixLoaderProps) {
 }
 
 // Full page loading screen
-export function SixLoadingScreen({ text = "読み込み中..." }: { text?: string }) {
+export function SixLoadingScreen({ text = "Loading..." }: { text?: string }) {
   return (
     <main className="h-dvh flex flex-col items-center justify-center bg-background gap-6">
       <SixLoader size="lg" />

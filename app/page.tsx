@@ -117,7 +117,7 @@ export default function HomePage() {
                   Si<span className="text-gradient-six">X</span>
                 </h1>
                 <p className="text-muted-foreground text-lg font-light tracking-wide">
-                  6分で消える、6時間で閉じる
+                  Gone in 6 min, closed in 6 hours
                 </p>
               </header>
 
@@ -131,7 +131,7 @@ export default function HomePage() {
                     className="text-center"
                   >
                     <p className="text-sm text-muted-foreground/80 font-light">
-                      これまでに <motion.span className="text-lg font-medium text-foreground mx-1">{countDisplay}</motion.span> 個の秘密の部屋が作成されています
+                      <motion.span className="text-lg font-medium text-foreground mx-1">{countDisplay}</motion.span> secret rooms created so far
                     </p>
                   </motion.div>
                 )}
@@ -141,7 +141,7 @@ export default function HomePage() {
                   className="w-full h-16 text-lg font-medium bg-gradient-to-r from-six-pink to-six-purple text-white hover:opacity-90 transition-all animate-glow-pulse"
                 >
                   <Plus className="mr-2" size={20} />
-                  新しい部屋を作る
+                  Create a New Room
                 </Button>
               </div>
 
@@ -151,7 +151,7 @@ export default function HomePage() {
               {/* Footer */}
               <footer className="text-center">
                 <p className="text-xs text-muted-foreground/60">
-                  URLやQRコードで招待して、二人だけの特別な空間を
+                  Invite via URL or QR code for a private space just for two
                 </p>
               </footer>
             </motion.div>
@@ -168,9 +168,9 @@ export default function HomePage() {
             >
               {/* Header */}
               <header className="text-center space-y-2">
-                <h2 className="text-2xl font-light">カラーを選択</h2>
+                <h2 className="text-2xl font-light">Choose Your Color</h2>
                 <p className="text-sm text-muted-foreground">
-                  あなたのメッセージカラーを選んでください
+                  Pick a color for your messages
                 </p>
               </header>
 
@@ -193,7 +193,7 @@ export default function HomePage() {
                     color: selectedColor,
                   }}
                 >
-                  プレビュー: あなたのメッセージ
+                  Preview: Your message
                 </div>
               </div>
 
@@ -211,10 +211,10 @@ export default function HomePage() {
                   {isCreating ? (
                     <span className="flex items-center gap-3">
                       <SixLoader size="sm" />
-                      作成中...
+                      Creating...
                     </span>
                   ) : (
-                    "部屋を作成"
+                    "Create Room"
                   )}
                 </Button>
 
@@ -223,7 +223,7 @@ export default function HomePage() {
                   variant="ghost"
                   className="w-full text-muted-foreground hover:text-foreground"
                 >
-                  戻る
+                  Back
                 </Button>
               </div>
             </motion.div>

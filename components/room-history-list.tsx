@@ -16,7 +16,7 @@ export function RoomHistoryList({ onRoomSelect }: RoomHistoryListProps) {
   const [history, setHistory] = useState<RoomHistoryItem[]>([]);
   const [roomStatuses, setRoomStatuses] = useState<Record<string, "active" | "closed" | "unknown">>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [, setTick] = useState(0); // カウントダウン更新用
+  const [, setTick] = useState(0); // For countdown updates
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -49,13 +49,13 @@ export function RoomHistoryList({ onRoomSelect }: RoomHistoryListProps) {
     };
 
     loadHistory();
-    
-    // 60秒ごとにカウントダウンを更新し、期限切れをチェック
+
+    // Update countdown every 60 seconds and check for expired rooms
     const interval = setInterval(() => {
       setTick((prev) => prev + 1);
-      const items = getRoomHistory(); // これで自動的に期限切れが除外される
+      const items = getRoomHistory(); // Automatically filters out expired rooms
       setHistory(items);
-    }, 60000); // 1分ごと
+    }, 60000); // Every 1 minute
 
     return () => clearInterval(interval);
   }, []);
@@ -63,7 +63,7 @@ export function RoomHistoryList({ onRoomSelect }: RoomHistoryListProps) {
   const handleRoomClick = (roomId: string) => {
     const status = roomStatuses[roomId];
     if (status === "closed") return;
-    
+
     onRoomSelect?.();
     router.push(`/room/${roomId}`);
   };
@@ -79,32 +79,32 @@ export function RoomHistoryList({ onRoomSelect }: RoomHistoryListProps) {
     const lastActivity = new Date(lastActivityTime);
     const now = new Date();
     const diffMs = now.getTime() - lastActivity.getTime();
-    
-    // 6時間 = 21600000ms
+
+    // 6 hours = 21600000ms
     const sixHoursMs = 6 * 60 * 60 * 1000;
     const remainingMs = sixHoursMs - diffMs;
-    
-    // 既に6時間を過ぎている場合
+
+    // Already past 6 hours
     if (remainingMs <= 0) {
-      return "期限切れ";
+      return "Expired";
     }
-    
+
     const remainingMins = Math.floor(remainingMs / (1000 * 60));
     const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
-    
-    // 残り6分以内：分単位で表示
+
+    // Less than 6 minutes remaining: show in minutes
     if (remainingMins <= 6) {
-      return `あと${remainingMins}min`;
+      return `${remainingMins}min left`;
     }
-    
-    // 残り6時間〜6分：1時間単位で表示
-    return `あと${remainingHours}時間`;
+
+    // 6 hours to 6 minutes: show in hours
+    return `${remainingHours}h left`;
   };
 
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
-        <div className="animate-pulse text-muted-foreground text-sm">読み込み中...</div>
+        <div className="animate-pulse text-muted-foreground text-sm">Loading...</div>
       </div>
     );
   }
@@ -117,9 +117,9 @@ export function RoomHistoryList({ onRoomSelect }: RoomHistoryListProps) {
     <div className="space-y-3">
       <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
         <Clock size={14} />
-        最近のルーム
+        Recent Rooms
       </h3>
-      
+
       <AnimatePresence>
         {history.map((item, index) => {
           const status = roomStatuses[item.roomId] || "unknown";
@@ -134,8 +134,8 @@ export function RoomHistoryList({ onRoomSelect }: RoomHistoryListProps) {
                 w-full p-3 rounded-xl text-left
                 flex items-center justify-between gap-3
                 transition-all duration-200
-                ${isClosed 
-                  ? "opacity-50 cursor-not-allowed bg-muted/20" 
+                ${isClosed
+                  ? "opacity-50 cursor-not-allowed bg-muted/20"
                   : "bg-muted/30 hover:bg-muted/50 cursor-pointer"
                 }
               `}
@@ -157,15 +157,15 @@ export function RoomHistoryList({ onRoomSelect }: RoomHistoryListProps) {
                 >
                   <MessageSquare size={18} style={{ color: item.userColor }} />
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium truncate">
-                      {item.roomName || (item.isCreator ? "作成したルーム" : "参加したルーム")}
+                      {item.roomName || (item.isCreator ? "Created Room" : "Joined Room")}
                     </span>
                     {isClosed && (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-destructive/20 text-destructive">
-                        終了
+                        Closed
                       </span>
                     )}
                   </div>

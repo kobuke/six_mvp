@@ -53,10 +53,10 @@ export function GuestColorPickerModal({
               {/* Header */}
               <header className="text-center space-y-2">
                 <h2 className="text-2xl font-light">
-                  Si<span className="text-gradient-six">X</span> へようこそ
+                  Welcome to Si<span className="text-gradient-six">X</span>
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  あなたのメッセージカラーを選んでください
+                  Pick a color for your messages
                 </p>
               </header>
 
@@ -79,7 +79,7 @@ export function GuestColorPickerModal({
                     color: selectedColor,
                   }}
                 >
-                  プレビュー: あなたのメッセージ
+                  Preview: Your message
                 </div>
               </div>
 
@@ -96,10 +96,10 @@ export function GuestColorPickerModal({
                 {isSubmitting ? (
                   <span className="flex items-center gap-3">
                     <SixLoader size="sm" />
-                    参加中...
+                    Joining...
                   </span>
                 ) : (
-                  "このカラーで参加"
+                  "Join with this color"
                 )}
               </Button>
             </motion.div>

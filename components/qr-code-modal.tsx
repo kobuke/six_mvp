@@ -73,7 +73,7 @@ export function QRCodeModal({ open, onClose, roomId, encryptionKey }: QRCodeModa
             transition={{ type: "spring", duration: 0.5 }}
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium text-gradient-six">部屋を共有</h2>
+              <h2 className="text-lg font-medium text-gradient-six">Share Room</h2>
               <Button
                 variant="ghost"
                 size="icon"
@@ -102,7 +102,7 @@ export function QRCodeModal({ open, onClose, roomId, encryptionKey }: QRCodeModa
 
               {/* Room ID */}
               <div className="text-center space-y-1">
-                <p className="text-xs text-muted-foreground">ルームID</p>
+                <p className="text-xs text-muted-foreground">Room ID</p>
                 <p className="text-sm font-mono text-six-purple break-all">{roomId}</p>
               </div>
 
@@ -115,19 +115,19 @@ export function QRCodeModal({ open, onClose, roomId, encryptionKey }: QRCodeModa
                 {copied ? (
                   <>
                     <Check className="w-4 h-4 text-six-pink" />
-                    コピーしました
+                    Copied!
                   </>
                 ) : (
                   <>
                     <Copy className="w-4 h-4" />
-                    リンクをコピー
+                    Copy Link
                   </>
                 )}
               </Button>
             </div>
 
             <p className="text-xs text-center text-muted-foreground">
-              このQRコードまたはリンクを相手に共有してください
+              Share this QR code or link with the other person
             </p>
           </motion.div>
         </div>

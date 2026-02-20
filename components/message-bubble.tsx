@@ -141,12 +141,12 @@ function MediaPreview({
           {isOwn ? (
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <EyeOff size={14} />
-              <span>未開封</span>
+              <span>Unopened</span>
             </div>
           ) : (
             <div className="flex items-center gap-1.5 text-sm" style={{ color: userColor }}>
               <Eye size={14} />
-              <span>{isLoading ? "開封中..." : "タップして開封"}</span>
+              <span>{isLoading ? "Opening..." : "Tap to reveal"}</span>
             </div>
           )}
         </div>
@@ -268,18 +268,18 @@ export function MessageBubble({ message, isOwn, userColor, onRead, encryptionKey
   }, [message.expires_at, message.id]);
 
   const formatTime = useCallback((seconds: number) => {
-    // 360秒〜61秒：分単位で表示
+    // 360s to 61s: show in minutes
     if (seconds > 60) {
-      const mins = Math.ceil(seconds / 60); // 切り上げで「残り○分」を表示
-      return `残り${mins}分`;
+      const mins = Math.ceil(seconds / 60);
+      return `${mins}m left`;
     }
-    // 60秒以下：秒単位で表示
+    // 60s or less: show in seconds
     return `${seconds}s`;
   }, []);
 
   const formatCreatedAt = useCallback((dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString("ja-JP", {
+    return date.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -411,7 +411,7 @@ export function MessageBubble({ message, isOwn, userColor, onRead, encryptionKey
             {/* Read status for own messages */}
             {isOwn && (
               <span className="font-sans">
-                {message.is_read || message.is_media_revealed ? "既読" : "未読"}
+                {message.is_read || message.is_media_revealed ? "Read" : "Unread"}
               </span>
             )}
           </div>
